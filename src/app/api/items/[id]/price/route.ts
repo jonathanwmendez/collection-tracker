@@ -3,7 +3,7 @@ import { jsonError, requireUser } from "@/lib/api-auth";
 import { errorResponse } from "@/lib/api-errors";
 import { itemContext, verifiedRow } from "@/lib/item-sheet";
 import { canCheckPrice, lookupCardPrice } from "@/lib/prices";
-import { appendNote, itemCells, stripEstimateTag, todayISO } from "@/lib/sheet-format";
+import { appendNote, itemCells, stripEstimateTag, stripPriceNotes, todayISO } from "@/lib/sheet-format";
 import { writeCells } from "@/lib/sheets";
 
 export const maxDuration = 30;
@@ -31,10 +31,10 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
     const today = todayISO();
     const condition = (item.condition ?? "").trim();
-    const conditionNote = condition && condition !== "NM" ? ` Near-mint price; this card is ${condition}.` : "";
+    const conditionNote = condition && condition !== "NM" ? `, near-mint price (card is ${condition})` : "";
     const notes = appendNote(
-      stripEstimateTag(item.notes ?? ""),
-      `Verified $${result.value} on ${today}: ${result.source}, ${result.matched}.${conditionNote}`,
+      stripPriceNotes(stripEstimateTag(item.notes ?? "")),
+      `Verified $${result.value} on ${today}: ${result.source}, ${result.matched}${conditionNote}.`,
     );
 
     const { headers } = await verifiedRow(ctx);

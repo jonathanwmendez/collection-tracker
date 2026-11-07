@@ -7,7 +7,7 @@ import { writeCells } from "@/lib/sheets";
 
 /**
  * Queues the item for Claude's scheduled price check by clearing Last Checked in the sheet.
- * The check runs every 4 hours on your Claude plan and prices every row with an empty Last Checked.
+ * The check runs nightly at 3:30 AM on your Claude plan and prices every row with an empty Last Checked.
  */
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireUser();

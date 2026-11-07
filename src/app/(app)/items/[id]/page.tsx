@@ -92,7 +92,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
         </div>
         {item.value_status === "estimate" && (
           <p className="text-sm rounded-lg bg-clay-soft text-clay-ink px-3 py-2">
-            This is Claude&apos;s estimate from the photo. The scheduled price check verifies it against real sales within 4 hours.
+            This is Claude&apos;s estimate from the photo. Claude&apos;s price check verifies it against real sales, right after approval or at 3:30 AM.
           </p>
         )}
         {history.length > 0 && (

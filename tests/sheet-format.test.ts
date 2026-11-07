@@ -14,6 +14,7 @@ import {
   safeCell,
   sheetIdFrom,
   stripEstimateTag,
+  stripPriceNotes,
   valueStatusOf,
 } from "../src/lib/sheet-format";
 
@@ -125,4 +126,14 @@ test("itemCells writes only editable columns that exist, never Auto columns", ()
     Notes: "n",
   });
   assert.ok(!cells.some((c) => /Auto/.test(FIGURE_HEADERS[c.col]!)));
+});
+
+test("stripPriceNotes keeps the owner's text and drops old results", () => {
+  const notes =
+    "Box has corner wear. Verified $22.50 on 2026-11-06: median of 5 sold (eBay, 130point). Price check 2026-12-07: no reliable sold data, value is an estimate. Set by hand to $30 on 2026-12-08. Keep forever.";
+  assert.equal(stripPriceNotes(notes), "Box has corner wear. Keep forever.");
+  assert.equal(
+    stripPriceNotes("Verified $1.49 on 2026-11-06: TCGplayer market price via Scryfall, Sol Ring, Commander 2021 #263 (Non-foil), near-mint price (card is LP)."),
+    "",
+  );
 });

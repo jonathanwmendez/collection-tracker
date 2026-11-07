@@ -247,3 +247,14 @@ export function priceSummary(notes: string, status: ValueStatus): string {
   const end = rest.search(/\.(\s|$)/);
   return (end >= 0 ? rest.slice(0, end + 1) : rest).trim().slice(0, 300);
 }
+
+/**
+ * Removes earlier price-check sentences ("Verified $X on ...", "Price check ...: no reliable sold data ...",
+ * "Set by hand to $X on ..."), so Notes keeps the owner's text plus only the latest result.
+ */
+export function stripPriceNotes(notes: string): string {
+  return notes
+    .replace(/\s*(?:Verified \$|Set by hand to \$)[\d,]*(?:\.\d+)? on \d{4}-\d{2}-\d{2}.*?\.(?=\s|$)/g, "")
+    .replace(/\s*Price check \d{4}-\d{2}-\d{2}: no reliable sold data.*?\.(?=\s|$)/gi, "")
+    .trim();
+}

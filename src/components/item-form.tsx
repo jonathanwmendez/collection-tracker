@@ -161,7 +161,7 @@ export function ItemForm({ mode, itemId, initial }: { mode: "edit" | "add"; item
 
       <p className="text-xs text-muted">
         {mode === "add"
-          ? "Saved as a new row in your sheet. Claude's scheduled price check prices it from real sales within 4 hours."
+          ? "Saved as a new row in your sheet. Claude's nightly price check (3:30 AM) prices it from real sales."
           : "Saved to your sheet. Changing the value marks it as set by hand, so the scheduled check leaves it until it's due again."}
       </p>
 

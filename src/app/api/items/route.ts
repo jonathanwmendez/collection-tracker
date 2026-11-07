@@ -11,7 +11,7 @@ export const maxDuration = 60;
 
 /**
  * Adds an item typed in by hand (no photo) as a new row in its sheet tab, then syncs.
- * Last Checked stays empty, so Claude's scheduled price check prices it within 4 hours.
+ * Last Checked stays empty, so Claude's nightly price check (3:30 AM) prices it.
  */
 export async function POST(request: Request) {
   const auth = await requireUser();

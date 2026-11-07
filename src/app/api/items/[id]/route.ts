@@ -3,7 +3,7 @@ import { jsonError, requireUser } from "@/lib/api-auth";
 import { errorResponse } from "@/lib/api-errors";
 import { STATUSES, type Status } from "@/lib/categories";
 import { itemContext, ItemError, verifiedRow } from "@/lib/item-sheet";
-import { appendNote, itemCells, parseMoney, priceSummary, todayISO } from "@/lib/sheet-format";
+import { appendNote, itemCells, parseMoney, priceSummary, stripEstimateTag, stripPriceNotes, todayISO } from "@/lib/sheet-format";
 import { deleteRow, writeCells } from "@/lib/sheets";
 import { syncCollection } from "@/lib/sync";
 
@@ -46,7 +46,7 @@ export async function PATCH(request: Request, { params }: Params) {
       // A value you type counts as checked, so the scheduled price check leaves it alone until it's due again.
       lastChecked = todayISO();
       valueStatus = "verified";
-      notes = appendNote(notes, `Set by hand to $${marketValue} on ${lastChecked}.`);
+      notes = appendNote(stripPriceNotes(stripEstimateTag(notes)), `Set by hand to $${marketValue} on ${lastChecked}.`);
     } else if (valueChanged) {
       lastChecked = null;
       valueStatus = "estimate";

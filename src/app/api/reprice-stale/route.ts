@@ -26,7 +26,7 @@ export async function POST() {
     const { data: stale } = await supabase
       .from("items")
       .select("id, category, name, sheet_row")
-      .lt("last_checked", staleCutoff(settings.reprice_after_days ?? 90));
+      .lt("last_checked", staleCutoff(settings.reprice_after_days ?? 30));
     const items = stale ?? [];
     if (items.length === 0) return NextResponse.json({ queued: 0, skipped: 0 });
 

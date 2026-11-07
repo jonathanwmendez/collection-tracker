@@ -58,7 +58,7 @@ export default async function AddPage() {
         <ol className="text-sm text-muted text-left flex flex-col gap-1 max-w-sm list-decimal pl-5">
           <li>Add a photo of each item and check what Claude found.</li>
           <li>Approve it. Claude saves the photo to Drive and the row to your sheet.</li>
-          <li>Come back here. New items appear after the sync, and their verified price lands within 4 hours.</li>
+          <li>Come back here. New items appear after the sync. Approving starts a price check right away, and the verified price usually lands within minutes.</li>
         </ol>
       </section>
 

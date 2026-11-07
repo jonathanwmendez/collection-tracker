@@ -10,6 +10,9 @@ alter table settings
   add column if not exists sheet_tabs jsonb not null default '{}'::jsonb,
   add column if not exists last_synced_at timestamptz;
 
+-- Prices are rechecked every 30 days by default (the nightly price check uses the same window).
+alter table settings alter column reprice_after_days set default 30;
+
 -- One photo row per Drive file per item.
 create unique index if not exists photos_item_drive_idx on photos (item_id, drive_file_id);
 

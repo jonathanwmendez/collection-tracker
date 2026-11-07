@@ -22,7 +22,7 @@ export async function getSettings(supabase: SupabaseClient): Promise<Settings> {
     intake_url: data?.intake_url ?? null,
     sheet_tabs: (data?.sheet_tabs ?? {}) as Record<string, number>,
     last_synced_at: data?.last_synced_at ?? null,
-    reprice_after_days: data?.reprice_after_days ?? 90,
+    reprice_after_days: data?.reprice_after_days ?? 30,
   };
 }
 

@@ -9,7 +9,7 @@ The Google Sheet is the main copy of the collection. Three pieces work on it:
 | Piece | Runs on | What it does |
 |---|---|---|
 | **Collection Intake** | A Claude artifact, on the owner's Claude plan | Take a photo, Claude identifies the item and estimates a price, you approve, and it saves the photo to Drive and the row to the sheet |
-| **Scheduled price check** | A Claude scheduled task, every 4 hours | Prices every row with an empty Last Checked from recent sold listings, and notes the source |
+| **Price check** | A Claude scheduled task, nightly at 3:30 AM, plus an immediate run when Intake approves an item | Prices new rows from recent sold listings, then rechecks up to 25 prices older than 30 days each night, and notes the sources |
 | **This web app** | Vercel + Supabase | Syncs from the sheet, then browses, searches, edits, deletes, values, and charts the collection |
 
 Identification and sales research run inside Claude, so they use the Claude subscription rather than paid API calls. The web app itself makes no Claude calls.

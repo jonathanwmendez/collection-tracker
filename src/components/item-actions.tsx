@@ -42,7 +42,7 @@ export function ItemActions({
     const r = await api(`/api/items/${id}/reprice`, { method: "POST" });
     setBusy(null);
     if (!r.ok) return setMsg({ kind: "bad", text: r.error, needsSignIn: r.needsSignIn });
-    setMsg({ kind: "ok", text: "Queued. Claude's scheduled price check runs every 4 hours on your Claude plan and will price this item from recent sales." });
+    setMsg({ kind: "ok", text: "Queued. Claude's nightly price check (3:30 AM, on your Claude plan) will price this item from recent sales." });
     router.refresh();
   }
 

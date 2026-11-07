@@ -132,7 +132,7 @@ export default async function ValuePage() {
           </li>
         </ul>
         <p className="text-sm text-muted">
-          Claude&apos;s scheduled price check runs every 4 hours on your Claude plan and prices every item waiting for a check.
+          Claude&apos;s price check runs nightly at 3:30 AM on your Claude plan. It prices every item waiting for a check, then rechecks up to 25 of the oldest prices. Queuing prices them all that night.
         </p>
         {staleCount > 0 && <RepriceStale count={staleCount} />}
       </section>
