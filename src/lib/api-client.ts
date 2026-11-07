@@ -1,6 +1,8 @@
 // Calls the app's own API routes from the browser and returns errors as plain messages.
 
-export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string; needsSignIn?: boolean; status: number };
+export type ApiResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: string; needsSignIn?: boolean; status: number; body?: Record<string, unknown> };
 
 export async function api<T = Record<string, unknown>>(path: string, init?: RequestInit & { json?: unknown }): Promise<ApiResult<T>> {
   const { json, ...rest } = init ?? {};
@@ -20,6 +22,7 @@ export async function api<T = Record<string, unknown>>(path: string, init?: Requ
       error: typeof body.error === "string" ? body.error : "Something went wrong. Try again.",
       needsSignIn: Boolean(body.needsSignIn),
       status: res.status,
+      body,
     };
   }
   return { ok: true, data: body as T };

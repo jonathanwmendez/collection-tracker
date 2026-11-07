@@ -39,6 +39,8 @@ a{color:var(--link);text-underline-offset:2px}
 .drop{border:1.5px dashed var(--line);border-radius:14px;background:var(--surface);padding:22px 18px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
 .drop.over{border-color:var(--primary);background:var(--primary-soft)}
 .drop p{margin:0;color:var(--muted);font-size:14px;max-width:44ch}
+.drop .multi{flex-direction:row;align-items:center;gap:8px;font-size:14px;color:var(--ink);font-weight:400}
+.drop .multi input{width:20px;height:20px;min-width:20px;padding:0}
 button,.btn{font:inherit;font-weight:500;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:10px 16px;min-height:44px;cursor:pointer}
 button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
 button:disabled{opacity:.55;cursor:default}
@@ -112,6 +114,7 @@ textarea{min-height:64px;resize:vertical}
 
   <section class="drop" id="drop" aria-label="Add photos">
     <p>One photo per item. For a card, add the back to the same item after it appears.</p>
+    <label class="multi"><input type="checkbox" id="multi"> Each photo shows several cards (a binder page or a spread, up to 9)</label>
     <button class="primary big" id="pick" type="button">Add photos</button>
     <input id="file" class="sr" type="file" accept="image/*" multiple>
   </section>
@@ -133,7 +136,7 @@ const SHEET = "{{SHEET_ID}}";
 const TRIGGER = "{{PRICE_CHECK_TASK_ID}}";
 const CARD_COND = ["NM","LP","MP","HP","DMG"];
 const PAPER_COND = ["Mint","Near Mint","Very Good","Good","Fair","Poor"];
-const TAIL = ["@mv","@auto","@lc","@auto","@status","@photo","@notes"];
+const TAIL = ["@mv","@auto","@lc","@auto","@status","@photo","@notes","@paid"];
 const TABS = {
   "Sports Cards": {folder:"{{FOLDER_SPORTS_CARDS}}", cond:["Raw","Graded"],
     cols:["Player","Year","Brand / Set","Card #","Parallel / Variant","@cond","Grade","@qty",...TAIL]},
@@ -257,10 +260,11 @@ drop.addEventListener("dragleave", () => drop.classList.remove("over"));
 drop.addEventListener("drop", e => { e.preventDefault(); drop.classList.remove("over"); addFiles(e.dataTransfer.files); });
 
 function addFiles(list){
+  const multi = document.getElementById("multi").checked;
   for (const f of list){
     if (!f.type.startsWith("image/")) continue;
-    const it = {id: ++seq, photos:[f], rot:[0], state:"queued", draft:null, error:"", steps:[]};
-    items.push(it); render(it); identify(it);
+    const it = {id: ++seq, photos:[f], rot:[0], state:"queued", draft:null, error:"", steps:[], multi};
+    items.push(it); render(it); multi ? identifyMany(it) : identify(it);
   }
 }
 
@@ -289,26 +293,81 @@ Reply with only this JSON object:
 {"tab": "<tab name exactly>", "fields": {"<field>": "<value>"}, "condition": "<value>", "qty": 1, "estimate": 0, "range": [0, 0], "confidence": "high|medium|low", "notes": "<short: identifiers seen, visible wear>", "uncertain": "<what you could not confirm, or empty>", "newCategory": "<or empty>"}`;
 }
 
+function multiPrompt(){
+  const spec = {};
+  for (const [t, c] of Object.entries(TABS)) spec[t] = {fields: fieldsOf(t), conditions: c.cond, ...(c.opts ? {suggested_values: c.opts} : {})};
+  return `You identify collectibles from a photo for a collection spreadsheet. This photo shows SEVERAL separate items, usually cards in a binder page or laid out in a grid (up to 9).
+
+List every item you can see, reading left to right, top to bottom. For each one, pick the tab that fits best and fill in its fields. Tabs, their fields, and allowed condition values:
+${JSON.stringify(spec)}
+
+Rules:
+- Read every visible identifier: set names, card numbers, set codes, years, brands, grades on slabs.
+- Use "" for any field you can't determine. Never invent a card number or year.
+- Condition must be one of the tab's allowed values. Judge it from what is visible (sleeves can hide wear, so say so in "notes").
+- "estimate" is your best guess of the current market value for ONE unit in USD, based on typical recent sold prices. Keep it realistic.
+- "position" says where the item is, like "top left" or "middle center".
+- Plain wording. No em dashes.
+
+Reply with only this JSON object:
+{"items": [{"position": "<where>", "tab": "<tab name exactly>", "fields": {"<field>": "<value>"}, "condition": "<value>", "qty": 1, "estimate": 0, "range": [0, 0], "confidence": "high|medium|low", "notes": "<short>", "uncertain": "<or empty>"}]}`;
+}
+
+function draftFrom(out){
+  const tab = TABS[out?.tab] ? out.tab : "Other";
+  const fields = {};
+  for (const f of fieldsOf(tab)) fields[f] = String(out?.fields?.[f] ?? "");
+  const cond = TABS[tab].cond.includes(out?.condition) ? out.condition : TABS[tab].cond[0];
+  return {
+    tab, fields, cond,
+    qty: Math.max(1, parseInt(out?.qty, 10) || 1),
+    estimate: Number(out?.estimate) > 0 ? Math.round(Number(out.estimate) * 100) / 100 : "",
+    range: Array.isArray(out?.range) ? out.range.map(Number).filter(n => n >= 0) : [],
+    confidence: ["high","medium","low"].includes(out?.confidence) ? out.confidence : "medium",
+    notes: String(out?.notes || ""), uncertain: String(out?.uncertain || ""), newCategory: String(out?.newCategory || ""),
+    status: "Keep", paid: "",
+  };
+}
+
+// Several cards in one photo: one card per item found, all sharing the photo (uploaded to Drive once).
+async function identifyMany(it){
+  it.state = "identifying"; it.error = ""; render(it);
+  if (!sample){ it.state = "idfail"; it.error = "Claude isn't available in this view, so this photo can't be identified here."; render(it); return; }
+  await slot();
+  try {
+    const img = it.rot[0] ? await toJpeg(it.photos[0], 2400, 0.9, it.rot[0]) : it.photos[0];
+    const out = await sample.json(multiPrompt(), {images: [img], modelTier: "default"});
+    const found = (Array.isArray(out?.items) ? out.items : []).slice(0, 12);
+    if (!found.length){ it.state = "idfail"; it.error = "No items found. Try a straighter, closer photo, or turn off several-cards mode."; return; }
+    const group = {id: it.id, photo: it.photos[0], rot: it.rot[0] || 0, count: found.length};
+    let prev = document.getElementById("item-" + it.id);
+    found.forEach((o) => {
+      const d = draftFrom(o);
+      const where = String(o?.position || "").trim();
+      if (where) d.notes = `(${where} in the photo) ${d.notes}`.trim();
+      const child = {id: ++seq, photos:[it.photos[0]], rot:[it.rot[0] || 0], state:"draft", draft:d, error:"", steps:[], group, label: where};
+      items.push(child);
+      const el = h("article", {class:"card", id:"item-" + child.id, "aria-label":"Item " + child.id}, ...cardBody(child));
+      // Keep reading order (left to right, top to bottom) under the original card.
+      prev ? prev.after(el) : queue.prepend(el);
+      prev = el;
+    });
+    remove(it);
+    return;
+  } catch (e){
+    it.state = "idfail"; it.error = sampleWhy(e);
+  } finally { release(); if (items.includes(it)) render(it); }
+}
+
 async function identify(it){
+  if (it.multi) return identifyMany(it);
   it.state = "identifying"; it.error = ""; render(it);
   if (!sample){ it.state = "idfail"; it.error = "Claude isn't available in this view, so this item can't be identified here."; render(it); return; }
   await slot();
   try {
     const imgs = await Promise.all(it.photos.slice(0, imgMax).map((f, i) => it.rot[i] ? toJpeg(f, 2000, 0.9, it.rot[i]) : f));
     const out = await sample.json(prompt(), {images: imgs, modelTier: "default"});
-    const tab = TABS[out?.tab] ? out.tab : "Other";
-    const fields = {};
-    for (const f of fieldsOf(tab)) fields[f] = String(out?.fields?.[f] ?? "");
-    const cond = TABS[tab].cond.includes(out?.condition) ? out.condition : TABS[tab].cond[0];
-    it.draft = {
-      tab, fields, cond,
-      qty: Math.max(1, parseInt(out?.qty, 10) || 1),
-      estimate: Number(out?.estimate) > 0 ? Math.round(Number(out.estimate) * 100) / 100 : "",
-      range: Array.isArray(out?.range) ? out.range.map(Number).filter(n => n >= 0) : [],
-      confidence: ["high","medium","low"].includes(out?.confidence) ? out.confidence : "medium",
-      notes: String(out?.notes || ""), uncertain: String(out?.uncertain || ""), newCategory: String(out?.newCategory || ""),
-      status: "Keep",
-    };
+    it.draft = draftFrom(out);
     it.state = "draft";
   } catch (e){
     it.state = "idfail"; it.error = sampleWhy(e);
@@ -337,6 +396,14 @@ function cardBody(it){
     return [thumbs(it), h("div", {class:"err"}, it.error),
       h("div", {class:"row"}, h("button", {type:"button", onclick: () => identify(it)}, "Identify again"),
         h("button", {type:"button", class:"ghost", onclick: () => remove(it)}, "Discard"))];
+  if (it.state === "dup")
+    return [thumbs(it), h("b", {}, it.draft.fields[fieldsOf(it.draft.tab)[0]] || "Item"),
+      h("div", {class:"note info"}, `You already have this in ${it.draft.tab}, row ${it.dup.row}${it.dup.cond ? ` (${it.dup.cond})` : ""}, quantity ${it.dup.qty}.`),
+      it.error ? h("div", {class:"err"}, it.error) : null,
+      h("div", {class:"row"},
+        h("button", {type:"button", class:"primary", onclick: () => addToExisting(it)}, `Add ${Math.max(1, parseInt(it.draft.qty, 10) || 1)} to that row`),
+        h("button", {type:"button", onclick: () => { it.dupDecision = "new"; approve(it); }}, "Add as a new row"),
+        h("button", {type:"button", class:"ghost", onclick: () => { it.state = "draft"; render(it); }}, "Back to edit"))];
   if (it.state === "saving" || it.state === "saved" || it.state === "savefail")
     return [thumbs(it), h("b", {}, it.draft.fields[fieldsOf(it.draft.tab)[0]] || "Item"),
       h("ul", {class:"steps"}, it.steps.map(s => h("li", {class:s.state}, s.text))),
@@ -363,9 +430,10 @@ function draftForm(it){
     cfg.cond.map(c => h("option", {value:c, selected: c === d.cond}, c)));
   const range = d.range.length === 2 && d.range[1] > 0 ? `Likely range $${d.range[0]} to $${d.range[1]}.` : "";
   return [
-    thumbs(it, true),
+    thumbs(it, !it.group),
     it.error ? h("div", {class:"err"}, it.error) : null,
-    h("div", {class:"row"}, h("span", {class:"pill " + d.confidence}, `${d.confidence[0].toUpperCase() + d.confidence.slice(1)} confidence`)),
+    h("div", {class:"row"}, h("span", {class:"pill " + d.confidence}, `${d.confidence[0].toUpperCase() + d.confidence.slice(1)} confidence`),
+      it.group ? h("span", {class:"pill"}, it.label ? `From a ${it.group.count}-item photo, ${it.label}` : `From a ${it.group.count}-item photo`) : null),
     d.uncertain ? h("div", {class:"note"}, "Check this: " + d.uncertain) : null,
     d.newCategory ? h("div", {class:"note info"}, `Suggested new category: ${d.newCategory}. It's going in Other for now. Ask Claude in chat to add the tab if you want it.`) : null,
     h("div", {class:"grid"},
@@ -377,13 +445,14 @@ function draftForm(it){
         h("input", {id: pre + "est", type:"number", min:"0", step:"0.01", inputmode:"decimal", value:String(d.estimate), oninput: e => { d.estimate = e.target.value; }})),
       h("label", {}, "Status", h("select", {id: pre + "status", onchange: e => { d.status = e.target.value; }},
         STATUSES.map(s => h("option", {value:s, selected: s === d.status}, s)))),
+      h("label", {}, "Paid (each, optional)", h("input", {id: pre + "paid", type:"number", min:"0", step:"0.01", inputmode:"decimal", value:String(d.paid ?? ""), oninput: e => { d.paid = e.target.value; }})),
       h("div", {class:"est full"}, `${range} Verified against real sales after you approve.`),
       h("label", {class:"full"}, "Notes", h("textarea", {id: pre + "notes", oninput: e => { d.notes = e.target.value; }}, d.notes)),
     ),
     h("div", {class:"row"},
       h("button", {type:"button", class:"primary", onclick: () => approve(it)}, "Approve and add"),
-      h("button", {type:"button", onclick: () => addMore(it)}, "Add another photo"),
-      h("button", {type:"button", class:"ghost", onclick: () => identify(it)}, "Identify again"),
+      it.group ? null : h("button", {type:"button", onclick: () => addMore(it)}, "Add another photo"),
+      it.group ? null : h("button", {type:"button", class:"ghost", onclick: () => identify(it)}, "Identify again"),
       h("button", {type:"button", class:"ghost", onclick: () => remove(it)}, "Discard")),
   ];
 }
@@ -406,6 +475,56 @@ function remove(it){
   document.getElementById("item-" + it.id)?.remove();
 }
 
+// ---------- duplicates ----------
+const norm = v => String(v ?? "").trim().toLowerCase();
+const uploads = new Map(); // shared photo of a several-items photo: group id -> Drive link
+
+/** A row in the tab with the same name, the same filled-in details, and the same condition. */
+async function findDuplicate(d){
+  const cfg = TABS[d.tab], cols = cfg.cols;
+  const qtyCol = cols.indexOf("@qty"), condCol = cols.indexOf("@cond"), statusCol = cols.indexOf("@status");
+  const last = Math.max(qtyCol, condCol, statusCol);
+  const got = await mcp.callTool("Google Sheets", "get_values", {spreadsheetId: SHEET, range: `'${d.tab}'!A2:${L(last)}`}, {cache: false});
+  const rows = got?.payload?.values || [];
+  const fields = fieldsOf(d.tab);
+  for (let i = 0; i < rows.length; i++){
+    const r = rows[i];
+    if (!norm(r[0]) || norm(r[0]) !== norm(d.fields[fields[0]])) continue;
+    if (norm(r[statusCol]) === "sold") continue;
+    const same = fields.slice(1).every(f => {
+      const mine = norm(d.fields[f]), theirs = norm(r[cols.indexOf(f)]);
+      return !mine || !theirs || mine === theirs;
+    });
+    if (!same) continue;
+    if (norm(r[condCol]) && norm(r[condCol]) !== norm(d.cond)) continue;
+    return {row: i + 2, qty: Math.max(1, parseInt(r[qtyCol], 10) || 1), cond: r[condCol] || ""};
+  }
+  return null;
+}
+
+async function addToExisting(it){
+  const d = it.draft, cfg = TABS[d.tab];
+  const add = Math.max(1, parseInt(d.qty, 10) || 1);
+  it.state = "saving"; it.error = "";
+  it.steps = [{key:"qty", text:`Updating the quantity in row ${it.dup.row}`, state:"doing"}];
+  render(it);
+  try {
+    // Re-read the row first, so a sheet edited in the meantime isn't overwritten.
+    const got = await mcp.callTool("Google Sheets", "get_values", {spreadsheetId: SHEET, range: `'${d.tab}'!A${it.dup.row}:${L(cfg.cols.indexOf("@qty"))}${it.dup.row}`}, {cache: false});
+    const r = got?.payload?.values?.[0] || [];
+    if (norm(r[0]) !== norm(d.fields[fieldsOf(d.tab)[0]])) throw {code: "row_moved"};
+    const qty = (Math.max(1, parseInt(r[cfg.cols.indexOf("@qty")], 10) || 1)) + add;
+    await mcp.callTool("Google Sheets", "update_values",
+      {spreadsheetId: SHEET, range: `'${d.tab}'!${L(cfg.cols.indexOf("@qty"))}${it.dup.row}`, values: [[qty]]});
+    it.steps = [{key:"qty", text:`Quantity in ${d.tab}, row ${it.dup.row} is now ${qty}. No new row or photo added.`, state:"done"}];
+    it.state = "saved";
+  } catch (e){
+    it.state = "dup";
+    it.error = e?.code === "row_moved" ? "That row changed in the sheet. Add it as a new row, or check the sheet first." : mcpWhy(e);
+  }
+  render(it);
+}
+
 // ---------- approve: Drive photo, Sheets row, price check ----------
 const clean = s => String(s || "").replace(/[\\/:*?"<>|#%]+/g, " ").replace(/\s+/g, " ").trim();
 const safeCell = v => typeof v === "string" && /^[=+@]/.test(v) ? "'" + v : v;
@@ -417,6 +536,15 @@ async function approve(it){
   if (!mcp){ it.state = "savefail"; it.error = "Google Drive and Sheets aren't reachable from this view. Open the page in the Claude app or on claude.ai."; it.steps = []; render(it); return; }
   const cfg = TABS[d.tab];
   const done = it.done || (it.done = {});
+
+  // Already in the sheet? Offer to raise the quantity instead of adding a second row.
+  if (!done.row && !it.dupDecision){
+    try {
+      const dup = await findDuplicate(d);
+      if (dup){ it.dup = dup; it.state = "dup"; render(it); return; }
+    } catch { /* if the check fails, add the row as usual */ }
+  }
+
   it.state = "saving"; it.error = "";
   it.steps = [
     {key:"photo", text: done.photoUrl ? "Photo saved to Drive" : `Saving ${it.photos.length > 1 ? "photos" : "photo"} to the ${d.tab} folder`, state: done.photoUrl ? "done" : "doing"},
@@ -427,10 +555,17 @@ async function approve(it){
   const step = (k, state, text) => { const s = it.steps.find(x => x.key === k); s.state = state; if (text) s.text = text; render(it); };
 
   // 1. photos
+  if (!done.photoUrl && it.group && uploads.has(it.group.id)){
+    done.photoUrl = await uploads.get(it.group.id).catch(() => null);
+    if (done.photoUrl) step("photo", "done", "Photo already saved with the other items from this photo");
+  }
   if (!done.photoUrl){
+    let resolveShared;
+    if (it.group) uploads.set(it.group.id, new Promise((res, rej) => { resolveShared = {res, rej}; }));
     try {
       const yr = d.fields["Year"] || d.fields["Date"] || "";
-      const base = [clean(d.tab), clean(name), clean(yr)].filter(Boolean).join(" - ");
+      const stamp = new Date().toISOString().slice(0, 16).replace("T", " ").replace(":", "-");
+      const base = it.group ? `${clean(d.tab)} - ${it.group.count}-item photo - ${stamp}` : [clean(d.tab), clean(name), clean(yr)].filter(Boolean).join(" - ");
       const urls = [];
       for (let i = 0; i < it.photos.length; i++){
         const title = base + (i ? ` (${i + 1})` : "") + ".jpg";
@@ -449,8 +584,11 @@ async function approve(it){
         urls.push(p.viewUrl || (p.id ? `https://drive.google.com/file/d/${p.id}/view` : ""));
       }
       done.photoUrl = urls[0] || "none";
+      resolveShared?.res(done.photoUrl);
       step("photo", "done", `Saved ${it.photos.length > 1 ? it.photos.length + " photos" : "photo"} as “${base}.jpg”`);
     } catch (e){
+      if (it.group) uploads.delete(it.group.id);
+      resolveShared?.rej(e);
       step("photo", "fail"); it.state = "savefail";
       it.error = e?.code ? mcpWhy(e) : "The photo couldn't be prepared for upload. Try a different photo.";
       render(it); return;
@@ -475,6 +613,7 @@ async function approve(it){
           case "@status": return d.status;
           case "@photo": return done.photoUrl && done.photoUrl !== "none" ? `=HYPERLINK("${done.photoUrl}","Photo")` : "";
           case "@notes": return tag + d.notes.trim();
+          case "@paid": return Number(d.paid) > 0 ? Math.round(Number(d.paid) * 100) / 100 : "";
           default: return safeCell((d.fields[c] || "").trim());
         }
       });

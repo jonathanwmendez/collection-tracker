@@ -79,6 +79,9 @@ export default async function AddPage() {
             value: "",
             status: "Keep",
             notes: "",
+            paid: "",
+            soldPrice: "",
+            soldOn: "",
           }}
         />
       </details>

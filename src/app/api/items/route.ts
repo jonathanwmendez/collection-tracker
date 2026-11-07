@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { jsonError, requireUser } from "@/lib/api-auth";
 import { errorResponse } from "@/lib/api-errors";
 import { categoryByName, nameField, STATUSES, type Status } from "@/lib/categories";
 import { getGoogleAccessToken } from "@/lib/google";
-import { itemCells, parseMoney } from "@/lib/sheet-format";
+import { itemCells, optionalMoney, parseMoney } from "@/lib/sheet-format";
 import { nextEmptyRow, readRow, writeCells } from "@/lib/sheets";
 import { syncCollection } from "@/lib/sync";
 
@@ -41,6 +42,7 @@ export async function POST(request: Request) {
   const estimate = body.estimate === "" || body.estimate == null ? null : parseMoney(body.estimate);
   const status: Status = STATUSES.includes(body.status as Status) ? (body.status as Status) : "Keep";
   const typed = String(body.notes ?? "").trim().slice(0, 4000);
+  const paid = optionalMoney(body.paid, null);
   // Same tag Collection Intake uses, so the scheduled price check treats the value as unverified.
   const notes = (estimate !== null ? `[Estimate $${estimate}, not verified yet] ` : "[No estimate yet] ") + typed;
 
@@ -49,10 +51,16 @@ export async function POST(request: Request) {
     if (!settings?.sheet_id) return jsonError("Connect your Google Sheet in Settings first.", 400);
     const token = await getGoogleAccessToken(user.id);
 
+    // Already have it? Offer to raise the quantity instead of adding a second row.
+    if (body.allowDuplicate !== true) {
+      const dup = await findDuplicate(supabase, category.name, name, details, condition);
+      if (dup) return NextResponse.json({ duplicate: dup }, { status: 409 });
+    }
+
     const { headers } = await readRow(token, settings.sheet_id, category.name, 1);
     if (headers.size === 0) return jsonError(`Your sheet has no "${category.name}" tab.`, 400);
     const row = await nextEmptyRow(token, settings.sheet_id, category.name);
-    const cells = itemCells(category, headers, { name, details, condition, quantity, marketValue: estimate, status, notes: notes.trim() });
+    const cells = itemCells(category, headers, { name, details, condition, quantity, marketValue: estimate, status, notes: notes.trim(), paid });
     await writeCells(token, settings.sheet_id, category.name, row, cells);
 
     await syncCollection(supabase, user.id);
@@ -66,4 +74,30 @@ export async function POST(request: Request) {
   } catch (e) {
     return errorResponse(e, "Couldn't add the item.");
   }
+}
+
+const norm = (v: unknown) => String(v ?? "").trim().toLowerCase();
+
+/** An item you still own with the same name, the same filled-in details, and the same condition. */
+async function findDuplicate(
+  supabase: SupabaseClient,
+  category: string,
+  name: string,
+  details: Record<string, string>,
+  condition: string,
+): Promise<{ id: string; row: number | null; quantity: number } | null> {
+  const { data } = await supabase
+    .from("items")
+    .select("id, name, details, condition, quantity, sheet_row, status")
+    .eq("category", category)
+    .ilike("name", name.replace(/[%_\\]/g, (c) => "\\" + c));
+  for (const r of data ?? []) {
+    if (r.status === "Sold" || norm(r.name) !== norm(name)) continue;
+    const theirs = (r.details ?? {}) as Record<string, string>;
+    const same = Object.entries(details).every(([k, v]) => !norm(v) || !norm(theirs[k]) || norm(v) === norm(theirs[k]));
+    if (!same) continue;
+    if (norm(r.condition) && norm(condition) && norm(r.condition) !== norm(condition)) continue;
+    return { id: r.id as string, row: r.sheet_row as number | null, quantity: r.quantity as number };
+  }
+  return null;
 }

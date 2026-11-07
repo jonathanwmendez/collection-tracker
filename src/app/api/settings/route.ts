@@ -3,7 +3,7 @@ import { jsonError, requireUser } from "@/lib/api-auth";
 import { errorResponse } from "@/lib/api-errors";
 import { getGoogleAccessToken } from "@/lib/google";
 import { sheetIdFrom } from "@/lib/sheet-format";
-import { getTabs, writeRepriceDays } from "@/lib/sheets";
+import { getTabs, SUMMARY_SETTINGS, writeSummarySettings, type SummaryKey } from "@/lib/sheets";
 import { CATEGORIES } from "@/lib/categories";
 
 /** Saves the sheet link, the Collection Intake link, and the repricing window. Checks the sheet before saving. */
@@ -46,17 +46,35 @@ export async function POST(request: Request) {
       if (!Number.isFinite(days) || days < 1 || days > 3650) return jsonError("Pick a number of days between 1 and 3650.", 400);
       update.reprice_after_days = days;
     }
+    if (body.alertChangePct !== undefined) {
+      const raw = String(body.alertChangePct).trim();
+      const pct = raw === "" ? 0 : Math.round(Number(raw));
+      if (!Number.isFinite(pct) || pct < 0 || pct > 1000) return jsonError("Pick an alert percentage between 0 and 1000. Use 0 to turn alerts off.", 400);
+      update.alert_change_pct = pct;
+    }
+    if (body.gradingCost !== undefined) {
+      const raw = String(body.gradingCost).trim();
+      const cost = raw === "" ? null : Math.round(Number(raw) * 100) / 100;
+      if (cost !== null && (!Number.isFinite(cost) || cost < 0 || cost > 100000)) return jsonError("Enter a grading cost in dollars.", 400);
+      update.grading_cost = cost;
+    }
 
-    // Keep the sheet's "Reprice After (Days)" (read by the nightly price check) the same as the app's setting.
+    // Keep the sheet's Summary settings (read by the nightly price check) the same as the app's.
     let sheetNote: string | undefined;
-    if (update.reprice_after_days !== undefined) {
+    const shared: Partial<Record<SummaryKey, number | null>> = {};
+    if (update.reprice_after_days !== undefined) shared.repriceAfterDays = update.reprice_after_days as number;
+    if (update.alert_change_pct !== undefined) shared.alertChangePct = update.alert_change_pct as number;
+    if (update.grading_cost !== undefined) shared.gradingCost = update.grading_cost as number | null;
+    if (Object.keys(shared).length) {
       const sheetId =
         (update.sheet_id as string | undefined) ??
         ((await supabase.from("settings").select("sheet_id").eq("user_id", user.id).maybeSingle()).data?.sheet_id as string | undefined);
       if (sheetId) {
         const token = await getGoogleAccessToken(user.id);
-        const written = await writeRepriceDays(token, sheetId, update.reprice_after_days as number);
-        if (!written) sheetNote = "Saved in the app. Your sheet has no \"Reprice After (Days)\" row on its Summary tab, so the price check uses 30 days.";
+        const missing = await writeSummarySettings(token, sheetId, shared);
+        if (missing.length) {
+          sheetNote = `Saved in the app. Your sheet's Summary tab has no ${missing.map((k) => `"${SUMMARY_SETTINGS[k]}"`).join(" or ")} row, so the price check uses its defaults.`;
+        }
       }
     }
 

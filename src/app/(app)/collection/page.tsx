@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getItems, getSettings } from "@/lib/data";
 import { CATEGORIES } from "@/lib/categories";
-import { itemTotal, matchesQuery, sortItems, summarize } from "@/lib/collection";
+import { isSold, itemTotal, matchesQuery, sortItems, summarize } from "@/lib/collection";
 import { money, plural } from "@/lib/format";
 import { EmptyState } from "@/components/empty-state";
 import { ItemList } from "@/components/item-row";
@@ -86,7 +86,7 @@ export default async function CollectionPage({ searchParams }: { searchParams: P
           <ul className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {CATEGORIES.map((c) => {
               const list = items.filter((i) => i.category === c.name);
-              const value = list.reduce((s, i) => s + itemTotal(i), 0);
+              const value = list.filter((i) => !isSold(i)).reduce((s, i) => s + itemTotal(i), 0);
               return (
                 <li key={c.slug}>
                   <Link

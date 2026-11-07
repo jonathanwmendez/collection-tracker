@@ -92,33 +92,48 @@ export async function deleteRow(token: string, sheetId: string, gid: number, row
   });
 }
 
-const REPRICE_LABEL = "reprice after (days)";
+/** Settings rows on the Summary tab, shared by the app, the sheet, and the nightly price check. */
+export const SUMMARY_SETTINGS = {
+  repriceAfterDays: "Reprice After (Days)",
+  alertChangePct: "Alert On Change (%)",
+  gradingCost: "Grading Cost (Each)",
+} as const;
+export type SummaryKey = keyof typeof SUMMARY_SETTINGS;
+export type SummaryValues = Partial<Record<SummaryKey, { row: number; value: number | null }>>;
 
-/**
- * Finds the "Reprice After (Days)" setting on the Summary tab. The nightly price check reads it there,
- * so the app keeps it and its own setting the same. Returns null when the sheet has no such row.
- */
-async function findRepriceCell(token: string, sheetId: string): Promise<{ row: number; days: number | null } | null> {
+/** Reads the settings rows from the Summary tab. Missing rows are left out. */
+export async function readSummarySettings(token: string, sheetId: string): Promise<SummaryValues> {
   const res = await sheetsFetch(
     token,
     `${BASE}/${encodeURIComponent(sheetId)}/values/${encodeURIComponent("'Summary'!A1:B20")}?valueRenderOption=UNFORMATTED_VALUE`,
   ).catch(() => null);
-  if (!res) return null;
+  if (!res) return {};
   const rows = ((await res.json()) as { values?: unknown[][] }).values ?? [];
-  const i = rows.findIndex((r) => String(r[0] ?? "").trim().toLowerCase() === REPRICE_LABEL);
-  if (i < 0) return null;
-  const n = Math.round(Number(rows[i]![1]));
-  return { row: i + 1, days: Number.isFinite(n) && n > 0 ? n : null };
+  const out: SummaryValues = {};
+  for (const [key, label] of Object.entries(SUMMARY_SETTINGS) as Array<[SummaryKey, string]>) {
+    const i = rows.findIndex((r) => String(r[0] ?? "").trim().toLowerCase() === label.toLowerCase());
+    if (i < 0) continue;
+    const raw = rows[i]![1];
+    const n = raw === "" || raw == null ? NaN : Number(raw);
+    out[key] = { row: i + 1, value: Number.isFinite(n) && n >= 0 ? n : null };
+  }
+  return out;
 }
 
-export async function readRepriceDays(token: string, sheetId: string): Promise<number | null> {
-  return (await findRepriceCell(token, sheetId))?.days ?? null;
-}
-
-/** Writes the app's repricing window to the sheet. Returns false when the sheet has no setting row. */
-export async function writeRepriceDays(token: string, sheetId: string, days: number): Promise<boolean> {
-  const cell = await findRepriceCell(token, sheetId);
-  if (!cell) return false;
-  await writeMany(token, sheetId, [{ tab: "Summary", row: cell.row, col: 1, value: days }]);
-  return true;
+/** Writes settings to their Summary rows. Returns the keys the sheet has no row for. */
+export async function writeSummarySettings(
+  token: string,
+  sheetId: string,
+  values: Partial<Record<SummaryKey, number | null>>,
+): Promise<SummaryKey[]> {
+  const found = await readSummarySettings(token, sheetId);
+  const missing: SummaryKey[] = [];
+  const writes: Array<CellWrite & { tab: string; row: number }> = [];
+  for (const [key, value] of Object.entries(values) as Array<[SummaryKey, number | null]>) {
+    const cell = found[key];
+    if (!cell) missing.push(key);
+    else writes.push({ tab: "Summary", row: cell.row, col: 1, value: value ?? "" });
+  }
+  await writeMany(token, sheetId, writes);
+  return missing;
 }

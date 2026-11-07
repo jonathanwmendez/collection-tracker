@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isStale, marketLink, matchesQuery, sortItems, staleCutoff, subtitle, summarize, type Item } from "../src/lib/collection";
+import { gradingMath, isStale, marketLink, matchesQuery, realizedGain, sortItems, staleCutoff, subtitle, summarize, unrealizedGain, type Item } from "../src/lib/collection";
 
 const base: Item = {
   id: "1",
@@ -17,6 +17,11 @@ const base: Item = {
   sheet_row: 2,
   updated_at: "",
   photos: [],
+  paid: null,
+  sold_price: null,
+  sold_on: null,
+  psa9: null,
+  psa10: null,
 };
 
 test("subtitle, search, links", () => {
@@ -41,4 +46,43 @@ test("staleness and totals", () => {
   assert.equal(t.estimates, 1);
   assert.deepEqual(sortItems(items, "value").map((i) => i.id), ["2", "1"]);
   assert.deepEqual(sortItems(items, "unpriced").map((i) => i.id), ["2", "1"]);
+});
+
+test("cost, sales, and totals leave out sold items", () => {
+  const owned = { ...base, quantity: 2, market_value: 30, paid: 10 };
+  const sold = { ...base, id: "s", status: "Sold" as const, quantity: 1, market_value: 50, paid: 20, sold_price: 45, sold_on: "2026-10-01" };
+  assert.equal(unrealizedGain(owned), 40);
+  assert.equal(realizedGain(sold), 25);
+  assert.equal(unrealizedGain({ ...owned, paid: null }), null);
+  const t = summarize([owned, sold], 30);
+  assert.equal(t.total, 60);
+  assert.equal(t.items, 1);
+  assert.equal(t.paid, 20);
+  assert.equal(t.paidValue, 60);
+  assert.equal(t.soldCount, 1);
+  assert.equal(t.soldRevenue, 45);
+  assert.equal(t.realized, 25);
+  assert.ok(!isStale({ last_checked: "2020-01-01", status: "Sold" }, 30));
+});
+
+test("grading math", () => {
+  const card = { ...base, category: "Pokémon", condition: "NM", details: { Set: "Base" }, market_value: 40, psa9: 90, psa10: 300 };
+  const g = gradingMath(card, 30)!;
+  assert.equal(g.gain9, 20);
+  assert.equal(g.gain10, 230);
+  assert.ok(g.candidate);
+  assert.equal(gradingMath({ ...card, psa10: 100, psa9: 60 }, 30)!.candidate, false);
+  assert.equal(gradingMath({ ...card, condition: "Graded" }, 30), null);
+  assert.equal(gradingMath({ ...card, category: "Figures" }, 30), null);
+  assert.equal(gradingMath({ ...card, psa9: null, psa10: null }, 30), null);
+});
+
+test("CSV export quotes text and blocks formulas", async () => {
+  const { toCsv } = await import("../src/lib/csv");
+  const csv = toCsv([{ ...base, notes: 'Box wear, "minor"', name: "=HYPERLINK(1)" }]);
+  const [head, row] = csv.trim().split("\r\n");
+  assert.ok(head!.startsWith("Category,Name,Details,Year"));
+  assert.ok(row!.includes(`"Box wear, ""minor"""`));
+  assert.ok(row!.includes("'=HYPERLINK(1)"));
+  assert.ok(row!.includes("Line / Brand: Playmates Space Jam; Year: 1996"));
 });

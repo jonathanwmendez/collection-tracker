@@ -19,6 +19,12 @@ export type Item = {
   sheet_row: number | null;
   updated_at: string;
   photos: Photo[];
+  /** Per unit. Null when not filled in. */
+  paid: number | null;
+  sold_price: number | null;
+  sold_on: string | null;
+  psa9: number | null;
+  psa10: number | null;
 };
 
 export const SORTS = {
@@ -29,14 +35,57 @@ export const SORTS = {
 } as const;
 export type Sort = keyof typeof SORTS;
 
+const num = (v: unknown) => (v === null || v === undefined || v === "" ? null : Number(v));
+
 export function toItem(raw: Record<string, unknown>): Item {
   const photos = ((raw.photos as Photo[] | undefined) ?? []).slice().sort((a, b) => a.position - b.position);
   return {
     ...(raw as unknown as Item),
     details: (raw.details ?? {}) as Record<string, string>,
-    market_value: raw.market_value === null || raw.market_value === undefined ? null : Number(raw.market_value),
+    market_value: num(raw.market_value),
     photos,
+    paid: num(raw.paid),
+    sold_price: num(raw.sold_price),
+    sold_on: (raw.sold_on as string | null | undefined) ?? null,
+    psa9: num(raw.psa9),
+    psa10: num(raw.psa10),
   };
+}
+
+export const isSold = (i: Pick<Item, "status">) => i.status === "Sold";
+
+/** Gain on what you still own: current value minus what you paid, for items with a price paid. */
+export function unrealizedGain(i: Pick<Item, "quantity" | "market_value" | "paid">): number | null {
+  if (i.paid === null || i.market_value === null) return null;
+  return i.quantity * (i.market_value - i.paid);
+}
+
+/** Profit on a sale: sale price minus what you paid, when both are known. */
+export function realizedGain(i: Pick<Item, "quantity" | "sold_price" | "paid">): number | null {
+  if (i.paid === null || i.sold_price === null) return null;
+  return i.quantity * (i.sold_price - i.paid);
+}
+
+export const CARD_CATEGORIES = ["Sports Cards", "Magic: The Gathering", "Yu-Gi-Oh!", "Pokémon"];
+
+export function isGraded(i: Pick<Item, "category" | "condition" | "details">): boolean {
+  return (i.condition ?? "").toLowerCase() === "graded" || Boolean((i.details["Grade"] ?? "").trim());
+}
+
+export type Grading = { cost: number; gain9: number | null; gain10: number | null; candidate: boolean };
+
+/**
+ * What grading one copy could add, after the grading fee: PSA 9 or PSA 10 price minus today's value
+ * and the cost. A candidate if a PSA 10 would at least double your money after fees and clear $25.
+ */
+export function gradingMath(i: Item, cost: number): Grading | null {
+  if (!CARD_CATEGORIES.includes(i.category) || isGraded(i) || isSold(i) || i.market_value === null) return null;
+  if (i.psa9 === null && i.psa10 === null) return null;
+  const base = i.market_value + cost;
+  const gain9 = i.psa9 === null ? null : Math.round((i.psa9 - base) * 100) / 100;
+  const gain10 = i.psa10 === null ? null : Math.round((i.psa10 - base) * 100) / 100;
+  const candidate = gain10 !== null && gain10 >= Math.max(25, base);
+  return { cost, gain9, gain10, candidate };
 }
 
 export const itemTotal = (i: Pick<Item, "quantity" | "market_value">) => i.quantity * (i.market_value ?? 0);
@@ -47,8 +96,8 @@ export function staleCutoff(days: number, now = new Date()): string {
   return d.toISOString().slice(0, 10);
 }
 
-export function isStale(i: Pick<Item, "last_checked">, days: number, now = new Date()): boolean {
-  return Boolean(i.last_checked && i.last_checked < staleCutoff(days, now));
+export function isStale(i: Pick<Item, "last_checked"> & Partial<Pick<Item, "status">>, days: number, now = new Date()): boolean {
+  return i.status !== "Sold" && Boolean(i.last_checked && i.last_checked < staleCutoff(days, now));
 }
 
 /** The item's details in one line, like "1996 · Playmates Space Jam". */
@@ -81,14 +130,39 @@ export function sortItems(items: Item[], sort: Sort): Item[] {
   }
 }
 
-export function summarize(items: Item[], repriceDays: number) {
+/** Totals for what you still own. Sold items are counted separately. */
+export function summarize(all: Item[], repriceDays: number) {
   let total = 0,
     verified = 0,
     pieces = 0;
   let estimates = 0,
     unverifiable = 0,
     stale = 0;
+  let paid = 0,
+    paidValue = 0,
+    paidItems = 0;
+  let soldCount = 0,
+    soldRevenue = 0,
+    realized = 0,
+    realizedItems = 0;
+  for (const i of all) {
+    if (isSold(i)) {
+      soldCount++;
+      if (i.sold_price !== null) soldRevenue += i.quantity * i.sold_price;
+      const r = realizedGain(i);
+      if (r !== null) {
+        realized += r;
+        realizedItems++;
+      }
+    }
+  }
+  const items = all.filter((i) => !isSold(i));
   for (const i of items) {
+    if (i.paid !== null && i.market_value !== null) {
+      paid += i.quantity * i.paid;
+      paidValue += i.quantity * i.market_value;
+      paidItems++;
+    }
     const t = itemTotal(i);
     total += t;
     pieces += i.quantity;
@@ -97,7 +171,22 @@ export function summarize(items: Item[], repriceDays: number) {
     if (i.value_status === "unverifiable") unverifiable++;
     if (isStale(i, repriceDays)) stale++;
   }
-  return { total, verified, pieces, items: items.length, estimates, unverifiable, stale };
+  return {
+    total,
+    verified,
+    pieces,
+    items: items.length,
+    estimates,
+    unverifiable,
+    stale,
+    paid,
+    paidValue,
+    paidItems,
+    soldCount,
+    soldRevenue,
+    realized,
+    realizedItems,
+  };
 }
 
 // ---------- outside links ----------

@@ -3,8 +3,8 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getItem, getSettings } from "@/lib/data";
 import { categoryByName } from "@/lib/categories";
-import { isStale, itemTotal, marketLink, sheetLink } from "@/lib/collection";
-import { money, shortDate } from "@/lib/format";
+import { gradingMath, isStale, itemTotal, marketLink, realizedGain, sheetLink, unrealizedGain } from "@/lib/collection";
+import { money, shortDate, signedMoney } from "@/lib/format";
 import { canCheckPrice } from "@/lib/prices";
 import { ItemActions } from "@/components/item-actions";
 import { PhotoGallery } from "@/components/photo-gallery";
@@ -106,6 +106,59 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
         )}
       </section>
 
+      {(item.paid !== null || item.status === "Sold") && (
+        <section aria-labelledby="cost" className="rounded-2xl border border-line bg-surface p-4 flex flex-col gap-2 text-sm">
+          <h2 id="cost" className="text-xs font-medium uppercase tracking-wider text-muted">
+            {item.status === "Sold" ? "Sale" : "Cost"}
+          </h2>
+          {item.paid !== null && (
+            <p className="flex justify-between gap-3">
+              <span>Paid{item.quantity > 1 ? `, ${item.quantity} at ${money(item.paid)}` : ""}</span>
+              <span className="font-mono tabular-nums">{money(item.paid * item.quantity)}</span>
+            </p>
+          )}
+          {item.status === "Sold" ? (
+            <>
+              <p className="flex justify-between gap-3">
+                <span>Sold{item.sold_on ? ` ${shortDate(item.sold_on)}` : ""}</span>
+                <span className="font-mono tabular-nums">{item.sold_price === null ? "Price not set" : money(item.sold_price * item.quantity)}</span>
+              </p>
+              {realizedGain(item) !== null && <GainLine label="Profit" value={realizedGain(item)!} />}
+            </>
+          ) : (
+            unrealizedGain(item) !== null && <GainLine label="Gain so far" value={unrealizedGain(item)!} />
+          )}
+        </section>
+      )}
+
+      {(() => {
+        const g = gradingMath(item, settings.grading_cost);
+        if (!g) return null;
+        return (
+          <section aria-labelledby="grading" className="rounded-2xl border border-line bg-surface p-4 flex flex-col gap-2 text-sm">
+            <h2 id="grading" className="text-xs font-medium uppercase tracking-wider text-muted">
+              Grading
+            </h2>
+            {g.candidate && <p className="rounded-lg bg-ok-soft text-ok px-3 py-2">Worth considering for grading, if the card is in great shape.</p>}
+            {item.psa9 !== null && (
+              <p className="flex justify-between gap-3">
+                <span>PSA 9 sells for {money(item.psa9)}</span>
+                <span className="font-mono tabular-nums">{signedMoney(g.gain9!)}</span>
+              </p>
+            )}
+            {item.psa10 !== null && (
+              <p className="flex justify-between gap-3">
+                <span>PSA 10 sells for {money(item.psa10)}</span>
+                <span className="font-mono tabular-nums">{signedMoney(g.gain10!)}</span>
+              </p>
+            )}
+            <p className="text-xs text-muted">
+              Compared with today&apos;s ungraded value plus {money(g.cost)} to grade (set in Settings). Grades aren&apos;t guaranteed.
+            </p>
+          </section>
+        );
+      })()}
+
       <ItemActions id={item.id} name={item.name} category={item.category} canPrice={canCheckPrice(item.category)} />
 
       <section aria-labelledby="details" className="flex flex-col gap-2">
@@ -142,5 +195,14 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
         )}
       </nav>
     </article>
+  );
+}
+
+function GainLine({ label, value }: { label: string; value: number }) {
+  return (
+    <p className="flex justify-between gap-3 font-medium">
+      <span>{label}</span>
+      <span className={`font-mono tabular-nums ${value >= 0 ? "text-ok" : "text-bad"}`}>{signedMoney(value)}</span>
+    </p>
   );
 }

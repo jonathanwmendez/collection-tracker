@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { CATEGORIES } from "./categories";
 import { getGoogleAccessToken } from "./google";
 import { parseRow, priceSummary, todayISO, type SheetItem } from "./sheet-format";
-import { getTabs, readRepriceDays, readTabs } from "./sheets";
+import { getTabs, readSummarySettings, readTabs, type SummaryValues } from "./sheets";
 
 export class SyncError extends Error {
   constructor(
@@ -37,7 +37,7 @@ const chunks = <T,>(list: T[]) => Array.from({ length: Math.ceil(list.length / C
 export async function syncCollection(supabase: SupabaseClient, userId: string): Promise<SyncResult> {
   const { data: settings } = await supabase
     .from("settings")
-    .select("sheet_id, reprice_after_days")
+    .select("sheet_id, reprice_after_days, alert_change_pct, grading_cost")
     .eq("user_id", userId)
     .maybeSingle();
   const sheetId = settings?.sheet_id as string | undefined;
@@ -49,9 +49,9 @@ export async function syncCollection(supabase: SupabaseClient, userId: string): 
   const missingTabs = CATEGORIES.map((c) => c.name).filter((n) => !(n in tabs));
   if (present.length === 0) throw new SyncError("That sheet has none of the category tabs. Check the link in Settings.", 400);
 
-  const [data, sheetDays] = await Promise.all([
+  const [data, summary] = await Promise.all([
     readTabs(token, sheetId, present),
-    "Summary" in tabs ? readRepriceDays(token, sheetId) : Promise.resolve(null),
+    "Summary" in tabs ? readSummarySettings(token, sheetId) : Promise.resolve({} as SummaryValues),
   ]);
   const sheetItems: SheetItem[] = [];
   for (const tab of present) {
@@ -107,6 +107,11 @@ export async function syncCollection(supabase: SupabaseClient, userId: string): 
       status: s.status,
       notes: s.notes,
       sheet_row: s.row,
+      paid: s.paid,
+      sold_price: s.soldPrice,
+      sold_on: s.soldOn,
+      psa9: s.psa9,
+      psa10: s.psa10,
     };
   });
   for (const part of chunks(upserts)) {
@@ -185,11 +190,11 @@ export async function syncCollection(supabase: SupabaseClient, userId: string): 
 
   const { error: setErr } = await supabase
     .from("settings")
-    // A repricing window changed in the sheet carries over to the app, so both stay the same.
+    // Settings changed on the sheet's Summary tab carry over to the app, so both stay the same.
     .update({
       last_synced_at: now,
       sheet_tabs: tabs,
-      ...(sheetDays && sheetDays !== settings?.reprice_after_days ? { reprice_after_days: sheetDays } : {}),
+      ...summaryUpdates(summary, settings ?? {}),
     })
     .eq("user_id", userId);
   if (setErr) console.error("Couldn't save sync time", setErr);
@@ -205,12 +210,27 @@ export async function syncCollection(supabase: SupabaseClient, userId: string): 
 }
 
 /** Saves today's total value, for the value-over-time chart. One snapshot per day; later syncs replace it. */
-async function recordSnapshot(
-  supabase: SupabaseClient,
-  userId: string,
-  items: Array<{ quantity: number; marketValue: number | null }>,
-) {
+function summaryUpdates(summary: SummaryValues, current: Record<string, unknown>) {
+  const out: Record<string, number | null> = {};
+  const days = summary.repriceAfterDays?.value;
+  if (days && days >= 1 && days !== current.reprice_after_days) out.reprice_after_days = Math.round(days);
+  if (summary.alertChangePct && summary.alertChangePct.value !== (current.alert_change_pct ?? null)) {
+    out.alert_change_pct = summary.alertChangePct.value === null ? null : Math.round(summary.alertChangePct.value);
+  }
+  const cost = summary.gradingCost?.value;
+  if (summary.gradingCost && (cost ?? null) !== (current.grading_cost === null || current.grading_cost === undefined ? null : Number(current.grading_cost))) {
+    out.grading_cost = cost ?? null;
+  }
+  return out;
+}
+
+async function recordSnapshot(supabase: SupabaseClient, userId: string, all: SheetItem[]) {
+  // Sold items are no longer in the collection.
+  const items = all.filter((i) => i.status !== "Sold");
   const total = items.reduce((sum, i) => sum + i.quantity * (i.marketValue ?? 0), 0);
+  const paid = items.reduce((sum, i) => sum + i.quantity * (i.paid ?? 0), 0);
+  const byCategory: Record<string, number> = {};
+  for (const i of items) byCategory[i.category] = Math.round(((byCategory[i.category] ?? 0) + i.quantity * (i.marketValue ?? 0)) * 100) / 100;
   const { error } = await supabase.from("value_snapshots").upsert(
     {
       user_id: userId,
@@ -218,6 +238,8 @@ async function recordSnapshot(
       total_value: Math.round(total * 100) / 100,
       items: items.length,
       pieces: items.reduce((sum, i) => sum + i.quantity, 0),
+      paid: Math.round(paid * 100) / 100,
+      by_category: byCategory,
     },
     { onConflict: "user_id,taken_on" },
   );

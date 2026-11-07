@@ -14,6 +14,11 @@ export const COL = {
   status: "Status",
   photo: "Photo",
   notes: "Notes",
+  paid: "Paid (Each)",
+  soldPrice: "Sold For (Each)",
+  soldDate: "Sold Date",
+  psa9: "PSA 9 (Each)",
+  psa10: "PSA 10 (Each)",
 } as const;
 
 export type ValueStatus = "estimate" | "verified" | "unverifiable";
@@ -33,6 +38,13 @@ export type SheetItem = {
   notes: string;
   photoIds: string[];
   valueStatus: ValueStatus;
+  /** What you paid for one, what one sold for, and when (owner's columns). */
+  paid: number | null;
+  soldPrice: number | null;
+  soldOn: string | null;
+  /** Graded prices for one ungraded card, found by the price check. */
+  psa9: number | null;
+  psa10: number | null;
 };
 
 /** Header name (lowercased) to column index. */
@@ -166,7 +178,19 @@ export function parseRow(categoryName: string, headers: Headers, cells: unknown[
     notes,
     photoIds: driveFileIds(get(COL.photo)),
     valueStatus: valueStatusOf(lastChecked, notes),
+    paid: parseMoney(get(COL.paid)),
+    soldPrice: parseMoney(get(COL.soldPrice)),
+    soldOn: parseDate(get(COL.soldDate)),
+    psa9: parseMoney(get(COL.psa9)),
+    psa10: parseMoney(get(COL.psa10)),
   };
+}
+
+/** A money field from a form: undefined keeps the current value, empty clears it. */
+export function optionalMoney(v: unknown, current: number | null): number | null {
+  if (v === undefined) return current;
+  if (v === null || String(v).trim() === "") return null;
+  return parseMoney(v);
 }
 
 /** Keeps typed text from being read as a formula when written with USER_ENTERED. */
@@ -202,6 +226,9 @@ export function itemCells(
     lastChecked?: string | null;
     status?: Status;
     notes?: string;
+    paid?: number | null;
+    soldPrice?: number | null;
+    soldOn?: string | null;
   },
 ): CellWrite[] {
   const out: CellWrite[] = [];
@@ -219,6 +246,9 @@ export function itemCells(
   put(COL.lastChecked, item.lastChecked);
   put(COL.status, item.status);
   put(COL.notes, item.notes);
+  put(COL.paid, item.paid);
+  put(COL.soldPrice, item.soldPrice);
+  put(COL.soldDate, item.soldOn);
   return out;
 }
 

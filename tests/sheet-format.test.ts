@@ -137,3 +137,14 @@ test("stripPriceNotes keeps the owner's text and drops old results", () => {
     "",
   );
 });
+
+test("reads cost, sale, and graded price columns", () => {
+  const headers = readHeaders([...FIGURE_HEADERS, "Paid (Each)", "Sold For (Each)", "Sold Date"]);
+  const item = parseRow("Figures", headers, [...FIGURE_ROW, 15, "$40.00", 46300], 2)!;
+  assert.equal(item.paid, 15);
+  assert.equal(item.soldPrice, 40);
+  assert.equal(item.soldOn, "2026-10-05");
+  assert.equal(item.psa9, null);
+  const cells = itemCells(categoryByName("Figures")!, headers, { paid: 12.5, soldPrice: null, soldOn: "2026-11-01" });
+  assert.deepEqual(cells.map((c) => [c.col, c.value]), [[12, 12.5], [13, ""], [14, "2026-11-01"]]);
+});

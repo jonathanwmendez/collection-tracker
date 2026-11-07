@@ -14,7 +14,12 @@ export type FormValues = {
   value: string;
   status: string;
   notes: string;
+  paid: string;
+  soldPrice: string;
+  soldOn: string;
 };
+
+type Duplicate = { id: string; row: number | null; quantity: number };
 
 const input = "min-h-11 w-full min-w-0 rounded-lg border border-line bg-bg px-3 text-base text-ink";
 const labelCls = "flex flex-col gap-1 text-xs font-medium text-muted min-w-0";
@@ -28,6 +33,7 @@ export function ItemForm({ mode, itemId, initial }: { mode: "edit" | "add"; item
   const [v, setV] = useState<FormValues>(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<{ message: string; needsSignIn?: boolean } | null>(null);
+  const [dup, setDup] = useState<Duplicate | null>(null);
   const category = categoryByName(v.category) ?? CATEGORIES[0]!;
   const conditions = v.condition && !category.conditions.includes(v.condition) ? [v.condition, ...category.conditions] : category.conditions;
   const set = (patch: Partial<FormValues>) => setV((x) => ({ ...x, ...patch }));
@@ -40,10 +46,21 @@ export function ItemForm({ mode, itemId, initial }: { mode: "edit" | "add"; item
     set({ category: name, fields, condition: next.conditions.includes(v.condition) ? v.condition : "" });
   }
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  async function addToExisting(d: Duplicate) {
     setSaving(true);
     setError(null);
+    const r = await api(`/api/items/${d.id}`, { method: "PATCH", json: { quantity: d.quantity + Math.max(1, v.quantity) } });
+    setSaving(false);
+    if (!r.ok) return setError({ message: r.error, needsSignIn: r.needsSignIn });
+    router.replace(`/items/${d.id}`);
+    router.refresh();
+  }
+
+  async function submit(e: React.FormEvent | null, allowDuplicate = false) {
+    e?.preventDefault();
+    setSaving(true);
+    setError(null);
+    setDup(null);
     const nameKey = category.fields[0]!;
     const details = Object.fromEntries(category.fields.slice(1).map((f) => [f, v.fields[f] ?? ""]));
     const r =
@@ -58,13 +75,27 @@ export function ItemForm({ mode, itemId, initial }: { mode: "edit" | "add"; item
               marketValue: v.value,
               status: v.status,
               notes: v.notes,
+              paid: v.paid,
+              soldPrice: v.soldPrice,
+              soldOn: v.soldOn,
             },
           })
         : await api<{ id: string | null }>("/api/items", {
             method: "POST",
-            json: { category: v.category, fields: v.fields, condition: v.condition, quantity: v.quantity, estimate: v.value, status: v.status, notes: v.notes },
+            json: {
+              category: v.category,
+              fields: v.fields,
+              condition: v.condition,
+              quantity: v.quantity,
+              estimate: v.value,
+              status: v.status,
+              notes: v.notes,
+              paid: v.paid,
+              allowDuplicate,
+            },
           });
     setSaving(false);
+    if (!r.ok && r.status === 409 && r.body?.duplicate) return setDup(r.body.duplicate as Duplicate);
     if (!r.ok) return setError({ message: r.error, needsSignIn: r.needsSignIn });
     const newId = mode === "add" ? (r.data as { id: string | null }).id : itemId;
     router.replace(newId ? `/items/${newId}` : `/collection/${category.slug}`);
@@ -153,6 +184,40 @@ export function ItemForm({ mode, itemId, initial }: { mode: "edit" | "add"; item
             ))}
           </select>
         </label>
+        <label className={labelCls}>
+          Paid, each (optional)
+          <input
+            className={`${input} font-mono`}
+            type="number"
+            min={0}
+            step={0.01}
+            inputMode="decimal"
+            value={v.paid}
+            placeholder="0.00"
+            onChange={(e) => set({ paid: e.target.value })}
+          />
+        </label>
+        {mode === "edit" && v.status === "Sold" && (
+          <>
+            <label className={labelCls}>
+              Sold for, each
+              <input
+                className={`${input} font-mono`}
+                type="number"
+                min={0}
+                step={0.01}
+                inputMode="decimal"
+                value={v.soldPrice}
+                placeholder="0.00"
+                onChange={(e) => set({ soldPrice: e.target.value })}
+              />
+            </label>
+            <label className={labelCls}>
+              Sold date
+              <input className={input} type="date" value={v.soldOn} onChange={(e) => set({ soldOn: e.target.value })} />
+            </label>
+          </>
+        )}
         <label className={`${labelCls} sm:col-span-2`}>
           Notes
           <textarea className={`${input} min-h-24 py-2`} value={v.notes} onChange={(e) => set({ notes: e.target.value })} />
@@ -168,6 +233,24 @@ export function ItemForm({ mode, itemId, initial }: { mode: "edit" | "add"; item
       {error && (
         <Notice kind="bad" needsSignIn={error.needsSignIn}>
           {error.message}
+        </Notice>
+      )}
+
+      {dup && (
+        <Notice kind="info">
+          <span className="flex flex-col gap-2">
+            <span>
+              You already have this{dup.row ? ` (row ${dup.row} in your sheet)` : ""}, quantity {dup.quantity}.
+            </span>
+            <span className="flex flex-wrap gap-2">
+              <button type="button" disabled={saving} onClick={() => addToExisting(dup)} className="min-h-10 rounded-lg bg-navy px-3 text-sm font-medium text-navy-ink">
+                Add {Math.max(1, v.quantity)} to it
+              </button>
+              <button type="button" disabled={saving} onClick={() => submit(null, true)} className="min-h-10 rounded-lg border border-line bg-surface px-3 text-sm font-medium">
+                Add as a new row
+              </button>
+            </span>
+          </span>
         </Notice>
       )}
 

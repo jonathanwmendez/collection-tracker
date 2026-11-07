@@ -3,7 +3,7 @@ import { jsonError, requireUser } from "@/lib/api-auth";
 import { errorResponse } from "@/lib/api-errors";
 import { STATUSES, type Status } from "@/lib/categories";
 import { itemContext, ItemError, verifiedRow } from "@/lib/item-sheet";
-import { appendNote, itemCells, parseMoney, priceSummary, stripEstimateTag, stripPriceNotes, todayISO } from "@/lib/sheet-format";
+import { appendNote, itemCells, optionalMoney, parseDate, parseMoney, priceSummary, stripEstimateTag, stripPriceNotes, todayISO } from "@/lib/sheet-format";
 import { deleteRow, writeCells } from "@/lib/sheets";
 import { syncCollection } from "@/lib/sync";
 
@@ -36,6 +36,13 @@ export async function PATCH(request: Request, { params }: Params) {
     const quantity = Math.max(1, Math.min(100000, Math.round(Number(body.quantity) || item.quantity)));
     const status: Status = STATUSES.includes(body.status as Status) ? (body.status as Status) : (item.status as Status);
     let notes = String(body.notes ?? item.notes ?? "").trim().slice(0, 4000);
+    const cur = item as unknown as { paid: unknown; sold_price: unknown; sold_on: string | null };
+    const toNum = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+    const paid = optionalMoney(body.paid, toNum(cur.paid));
+    const soldPrice = optionalMoney(body.soldPrice, toNum(cur.sold_price));
+    let soldOn = body.soldOn === undefined ? cur.sold_on : parseDate(body.soldOn);
+    // Marking an item Sold without a date records today.
+    if (status === "Sold" && !soldOn) soldOn = todayISO();
 
     const before = item.market_value === null ? null : Number(item.market_value);
     const marketValue = body.marketValue === "" || body.marketValue === null ? null : parseMoney(body.marketValue ?? before);
@@ -60,13 +67,29 @@ export async function PATCH(request: Request, { params }: Params) {
       quantity,
       status,
       notes,
+      paid,
+      soldPrice,
+      soldOn,
       ...(valueChanged ? { marketValue, lastChecked } : {}),
     });
     await writeCells(ctx.token, ctx.sheetId, category.name, item.sheet_row!, cells);
 
     const { error } = await supabase
       .from("items")
-      .update({ name, details, condition, quantity, status, notes, market_value: marketValue, last_checked: lastChecked, value_status: valueStatus })
+      .update({
+        name,
+        details,
+        condition,
+        quantity,
+        status,
+        notes,
+        market_value: marketValue,
+        last_checked: lastChecked,
+        value_status: valueStatus,
+        paid,
+        sold_price: soldPrice,
+        sold_on: soldOn,
+      })
       .eq("id", id);
     if (error) console.error("Update item failed", error);
     if (valueChanged && marketValue !== null) {

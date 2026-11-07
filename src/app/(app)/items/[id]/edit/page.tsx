@@ -38,6 +38,9 @@ export default async function EditItemPage({ params }: { params: Promise<{ id: s
           value: item.market_value === null ? "" : String(item.market_value),
           status: item.status,
           notes: item.notes,
+          paid: item.paid === null ? "" : String(item.paid),
+          soldPrice: item.sold_price === null ? "" : String(item.sold_price),
+          soldOn: item.sold_on ?? "",
         }}
       />
     </div>

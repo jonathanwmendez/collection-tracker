@@ -67,6 +67,7 @@ export default async function CategoryPage({
           {plural(totals.items, "item")}
           {totals.pieces !== totals.items ? ` (${totals.pieces} pieces)` : ""} worth{" "}
           <span className="font-mono tabular-nums text-ink">{money(totals.total)}</span>
+          {totals.soldCount ? `, plus ${totals.soldCount} sold` : ""}
         </p>
       </div>
 
@@ -79,7 +80,7 @@ export default async function CategoryPage({
       ) : (
         <>
           {canCheckPrice(category.name) && (
-            <CheckAllPrices items={all.map((i) => ({ id: i.id, name: i.name }))} source={PRICE_SOURCE[category.name]!} />
+            <CheckAllPrices items={all.filter((i) => i.status !== "Sold").map((i) => ({ id: i.id, name: i.name }))} source={PRICE_SOURCE[category.name]!} />
           )}
 
           <SearchBox

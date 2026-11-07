@@ -27,3 +27,12 @@ export function timeAgo(iso: string | null | undefined, now = Date.now()): strin
 }
 
 export const plural = (n: number, one: string, many = one + "s") => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
+
+/** "+$12.50" or "-$3.00". */
+export function signedMoney(n: number): string {
+  return (n >= 0 ? "+" : "-") + money(Math.abs(n));
+}
+
+export function signedPct(n: number): string {
+  return `${n >= 0 ? "+" : "-"}${Math.abs(n) >= 10 ? Math.round(Math.abs(n)) : Math.abs(n).toFixed(1)}%`;
+}

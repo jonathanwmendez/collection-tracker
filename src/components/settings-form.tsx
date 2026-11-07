@@ -8,12 +8,27 @@ import { useSync } from "./sync";
 
 const input = "min-h-11 w-full min-w-0 rounded-lg border border-line bg-bg px-3 text-base text-ink";
 
-export function SettingsForm({ sheetUrl, intakeUrl, repriceDays }: { sheetUrl: string; intakeUrl: string; repriceDays: number }) {
+export function SettingsForm({
+  sheetUrl,
+  intakeUrl,
+  repriceDays,
+  alertPct,
+  gradingCost,
+}: {
+  sheetUrl: string;
+  intakeUrl: string;
+  repriceDays: number;
+  alertPct?: number | null;
+  gradingCost?: number;
+}) {
   const router = useRouter();
   const { sync } = useSync();
   const [sheet, setSheet] = useState(sheetUrl);
   const [intake, setIntake] = useState(intakeUrl);
   const [days, setDays] = useState(String(repriceDays));
+  const [alert, setAlert] = useState(alertPct === null || alertPct === undefined ? "" : String(alertPct));
+  const [grading, setGrading] = useState(String(gradingCost ?? 30));
+  const advanced = alertPct !== undefined;
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "bad"; text: string; needsSignIn?: boolean } | null>(null);
 
@@ -24,7 +39,12 @@ export function SettingsForm({ sheetUrl, intakeUrl, repriceDays }: { sheetUrl: s
     const sheetChanged = sheet.trim() !== sheetUrl;
     const r = await api<{ sheetTitle?: string; sheetNote?: string }>("/api/settings", {
       method: "POST",
-      json: { ...(sheetChanged ? { sheet } : {}), intakeUrl: intake, repriceAfterDays: days },
+      json: {
+        ...(sheetChanged ? { sheet } : {}),
+        intakeUrl: intake,
+        repriceAfterDays: days,
+        ...(advanced ? { alertChangePct: alert, gradingCost: grading } : {}),
+      },
     });
     setSaving(false);
     if (!r.ok) return setMsg({ kind: "bad", text: r.error, needsSignIn: r.needsSignIn });
@@ -56,6 +76,21 @@ export function SettingsForm({ sheetUrl, intakeUrl, repriceDays }: { sheetUrl: s
         <input className={`${input} max-w-32`} type="number" min={1} max={3650} value={days} onChange={(e) => setDays(e.target.value)} inputMode="numeric" />
         <span className="text-xs font-normal text-muted">Prices older than this are rechecked by the nightly price check. Saved to your sheet too, so both always match.</span>
       </label>
+      {advanced && (
+        <>
+          <label className="flex flex-col gap-1 text-sm font-medium">
+            Email me when a price moves by (%)
+            <input className={`${input} max-w-32`} type="number" min={0} max={1000} value={alert} onChange={(e) => setAlert(e.target.value)} inputMode="numeric" />
+            <span className="text-xs font-normal text-muted">The nightly price check emails you when a verified price moves this much and at least $5. Use 0 to turn alerts off.</span>
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-medium">
+            Grading cost per card ($)
+            <input className={`${input} max-w-32`} type="number" min={0} step={1} value={grading} onChange={(e) => setGrading(e.target.value)} inputMode="decimal" />
+            <span className="text-xs font-normal text-muted">Used to find cards worth grading. Include shipping if you like.</span>
+          </label>
+          <p className="text-xs text-muted">These settings are saved to your sheet&apos;s Summary tab too, so the app, the sheet, and the price check always match.</p>
+        </>
+      )}
       {msg && (
         <Notice kind={msg.kind} needsSignIn={msg.needsSignIn}>
           {msg.text}

@@ -34,6 +34,8 @@ export default async function SettingsPage() {
           sheetUrl={settings.sheet_id ? sheetLink(settings.sheet_id) : ""}
           intakeUrl={settings.intake_url ?? ""}
           repriceDays={settings.reprice_after_days}
+          alertPct={settings.alert_change_pct}
+          gradingCost={settings.grading_cost}
         />
       </section>
 

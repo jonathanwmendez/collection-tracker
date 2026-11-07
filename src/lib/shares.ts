@@ -25,7 +25,8 @@ function redact(item: Item, share: Share): Item {
 }
 
 export async function getSharedItems(share: Share): Promise<Item[]> {
-  let q = createAdminClient().from("items").select(SHARE_ITEM_COLUMNS).eq("user_id", share.user_id);
+  // Sold items are no longer in the collection.
+  let q = createAdminClient().from("items").select(SHARE_ITEM_COLUMNS).eq("user_id", share.user_id).neq("status", "Sold");
   if (share.categories?.length) q = q.in("category", share.categories);
   const { data } = await q.order("sheet_row", { ascending: true });
   return (data ?? []).map((r) => redact(toItem(r as Record<string, unknown>), share));

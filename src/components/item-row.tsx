@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { isStale, itemTotal, subtitle, type Item } from "@/lib/collection";
+import { isSold, isStale, itemTotal, subtitle, type Item } from "@/lib/collection";
 import { money } from "@/lib/format";
 import { ItemThumb } from "./item-thumb";
 import { StatusBadge, ValueBadge } from "./value-badge";
@@ -42,7 +42,15 @@ export function ItemRow({
         </div>
         {values && (
           <div className="text-right shrink-0 flex flex-col items-end gap-0.5">
-            <span className="font-mono text-sm tabular-nums">{item.market_value === null ? "No value" : money(itemTotal(item))}</span>
+            <span className="font-mono text-sm tabular-nums">
+              {isSold(item)
+                ? item.sold_price === null
+                  ? "Sold"
+                  : `Sold ${money(item.sold_price * item.quantity)}`
+                : item.market_value === null
+                  ? "No value"
+                  : money(itemTotal(item))}
+            </span>
             {item.quantity > 1 && item.market_value !== null && (
               <span className="text-[11px] text-muted font-mono tabular-nums">
                 {item.quantity} × {money(item.market_value)}
