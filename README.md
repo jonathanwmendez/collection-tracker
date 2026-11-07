@@ -37,9 +37,19 @@ Identifying and pricing run inside Claude, on a Claude subscription. The web app
 
 About 30 minutes. Do the steps in order: each one uses an address from the one before. Checked against each service in November 2026.
 
+**You need:** a Google account, a GitHub account, free Supabase and Vercel accounts, and a Claude plan with scheduled tasks and artifacts. In Claude (**Settings > Connectors**), connect:
+
+| Connector | Used by | For |
+|---|---|---|
+| Google Sheets | Setup, Collection Intake, price check | Reading and writing the sheet |
+| Google Drive | Setup, Collection Intake | Photo folders and uploads |
+| Gmail | Price check | Price alert emails. Optional: without it, alerts are skipped |
+
+Collection Intake also starts the price check right after you approve items, using Claude's own scheduled task tools. Nothing to connect for that.
+
 ### 1. Claude
 
-Paste [`claude/SETUP.md`](claude/SETUP.md) into a Claude conversation with the Google Drive and Google Sheets connectors on, after filling in your time zone where the prompt asks for it. It creates the sheet, photo folders, nightly price check, and Collection Intake, and gives you the sheet and Intake links for step 6.
+Paste [`claude/SETUP.md`](claude/SETUP.md) into a new Claude conversation, after filling in your time zone where the prompt asks for it. It creates the sheet, photo folders, nightly price check, and Collection Intake, and gives you the sheet and Intake links for step 6.
 
 ### 2. Supabase
 
@@ -77,6 +87,8 @@ Paste [`claude/SETUP.md`](claude/SETUP.md) into a Claude conversation with the G
 | `POKEMONTCG_API_KEY` | Optional, raises the Pokémon price lookup limit ([pokemontcg.io](https://pokemontcg.io)) |
 
 If you change a variable later, redeploy for it to take effect.
+
+To use a different `.vercel.app` address, add it under **Settings > Domains**. Then put the new address in three places: Supabase's Site URL, Supabase's Redirect URLs (with `/auth/callback`), and the Google client's Authorized JavaScript origins. Share links made on the old address stop working unless you redirect it (see `vercel.json`).
 
 ### 5. Supabase sign-in
 
@@ -130,6 +142,7 @@ For local sign-in, also add `http://localhost:3000` to the Google client's JavaS
 | `src/app/api/` | Sync, daily sync, item edit/delete/reprice/price, settings, export, access requests, admin, account deletion, photo previews |
 | `supabase/migrations/` | Tables: items, photos, price_checks, value_snapshots, settings, google_tokens, members, access_requests, shares |
 | `claude/` | Setup prompt, Collection Intake page, and price check prompt |
+| `vercel.json` | Daily sync schedule, and a redirect from this deployment's old address (safe to remove in a fork) |
 | `tests/` | Unit tests for row parsing, price lookups, access and share rules, collection math, and CSV export |
 
 ## Security

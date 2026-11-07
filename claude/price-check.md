@@ -62,7 +62,7 @@ WHAT TO WRITE
 PRICE ALERTS (nightly run only, after pricing)
 - Read the "Alert On Change (%)" setting on the 'Summary' tab. If it's blank or 0, skip alerts.
 - An alert is a repriced row that already had a verified value before this run (its Last Checked was filled), where the value moved by at least that percentage and by at least $5, up or down.
-- If there are any, send ONE email with the Gmail connector to {{EMAIL}}. Subject: "Collection Tracker: N price changes". Body: one line per item, biggest change first, like "Charizard (Pokémon): $310.00 to $412.50, up 33% (median of 6 sold, PriceCharting)", then the sheet's link (https://docs.google.com/spreadsheets/d/{{SHEET_ID}}/edit). Plain text. No email when nothing moved.
+- If there are any, send ONE email with the Gmail connector to {{EMAIL}}. Subject: "Collection Tracker: N price changes". Body: one line per item, biggest change first, like "Charizard (Pokémon): $310.00 to $412.50, up 33% (median of 6 sold, PriceCharting)", then the sheet's link (https://docs.google.com/spreadsheets/d/{{SHEET_ID}}/edit). Plain text. No email when nothing moved. If the Gmail connector isn't available, skip the email and put the alerts in the Price Log Notes instead.
 
 LOG EVERY RUN (last step, even when nothing was priced)
 1. Measure this session's token usage with Bash:
