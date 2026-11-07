@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api } from "@/lib/api-client";
-import { money, timeAgo } from "@/lib/format";
+import { money, plural, timeAgo } from "@/lib/format";
 import type { AccessRequest, Person } from "@/lib/admin-data";
 import { Notice } from "./notice";
 
@@ -166,7 +166,7 @@ export function AdminPanel({ people, requests, appUrl, me }: { people: Person[];
                 </ul>
                 <p className="text-xs text-muted">
                   {p.lastSignIn ? `Last sign-in ${timeAgo(p.lastSignIn)}` : "Hasn't signed in yet"}
-                  {p.items ? ` · ${p.items} items, ${money(p.value, { round: true })}` : ""}
+                  {p.items ? ` · ${plural(p.items, "item")}, ${money(p.value, { round: true })}` : ""}
                   {p.lastSynced ? ` · synced ${timeAgo(p.lastSynced)}` : ""}
                 </p>
                 {p.role !== "owner" && !self && (
