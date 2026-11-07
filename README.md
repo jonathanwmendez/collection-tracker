@@ -35,24 +35,48 @@ See [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql).
 
 ## Setup
 
+Checked against the Supabase, Google, and Vercel docs in November 2026. Button labels can shift, but the settings are the same.
+
+Do the parts in this order: each one needs an address from the one before it.
+
 ### 1. Supabase
 
-1. Create a free project at [supabase.com](https://supabase.com).
+1. Create a free project at [supabase.com](https://supabase.com). Under **Security**, keep **Enable Data API** on, turn **Automatically expose new tables** off, and turn **Enable automatic RLS** on.
 2. Open **SQL Editor**, paste the contents of `supabase/migrations/0001_init.sql`, and run it.
-3. In **Project Settings > API**, copy the project URL, the publishable key, and the secret key.
+3. Open **Settings > API Keys**. Copy the project URL, a **publishable** key, and a **secret** key. If the page has no publishable or secret key yet, create them there.
 
-### 2. Google sign-in
+### 2. Vercel
+
+1. Sign up at [vercel.com](https://vercel.com) with GitHub, then **Add New > Project** and import this repository. If it isn't listed, use **Adjust GitHub App Permissions** to give Vercel access to it.
+2. Before deploying, open **Environment Variables** and add the four variables from the table below.
+3. Deploy, then note the production address (for example `https://collection-tracker-xxxx.vercel.app`). The sign-in button won't work until parts 3 and 4 are done.
+
+### 3. Google sign-in
 
 1. In [Google Cloud Console](https://console.cloud.google.com), create a project.
-2. **APIs & Services > Library:** enable the **Google Drive API** and **Google Sheets API**.
-3. **APIs & Services > OAuth consent screen:** choose **External**, fill in the app name and your email, and add the scope `.../auth/drive.file`. Add yourself as a test user, then publish the app to **In production** so sign-ins don't expire every 7 days. Because the app only uses the `drive.file` scope, Google doesn't require a review.
-4. **APIs & Services > Credentials > Create credentials > OAuth client ID:** choose **Web application**, and add the redirect URI shown in Supabase under **Authentication > Providers > Google** (it looks like `https://<project-ref>.supabase.co/auth/v1/callback`).
-5. In Supabase, **Authentication > Providers > Google:** turn it on and paste the client ID and client secret.
-6. In Supabase, **Authentication > URL Configuration:** set the Site URL to your app's address, and add `http://localhost:3000/**` and your Vercel address followed by `/**` to the redirect URLs.
+2. Enable the **Google Drive API** and the **Google Sheets API** (search each name in the top bar, then **Enable**).
+3. Open **Google Auth Platform** and click **Get started**: app name, support email, audience **External**, contact email, then **Create**.
+4. **Audience > Test users:** add the Google account you'll sign in with. Leave the status on **Testing** (see the note below).
+5. **Data access > Add or remove scopes:** add `openid` and `.../auth/drive.file`, then **Save**.
+6. **Clients > Create client:** type **Web application**.
+   - **Authorized JavaScript origins:** your Vercel address (no trailing slash), plus `http://localhost:3000` for local development.
+   - **Authorized redirect URIs:** the callback URL from Supabase's Google provider page (step 4.1), which looks like `https://<project-ref>.supabase.co/auth/v1/callback`.
+   - Create it and copy the client ID and client secret.
 
-### 3. Environment variables
+**Testing vs. production.** In Testing, only listed test users can sign in, and Google ends their access 7 days after each sign-in, so you sign in again about once a week. Moving to **In production** removes that limit, but Google requires a home page, privacy policy, and terms of service on a domain you own and have verified, listed under **Branding**. That's a later step.
 
-Copy `.env.example` to `.env.local` and fill it in:
+### 4. Connect Google to Supabase
+
+1. In Supabase, **Authentication > Sign In / Providers > Google:** turn it on, paste the client ID and client secret, and save. This page also shows the callback URL used in step 3.6.
+2. **Authentication > URL Configuration:**
+   - **Site URL:** your Vercel address.
+   - **Redirect URLs:** `https://<your-vercel-address>/auth/callback` and `http://localhost:3000/**`.
+
+Then open your Vercel address and sign in.
+
+### Environment variables
+
+Set these in Vercel, and in `.env.local` (copied from `.env.example`) for local development:
 
 | Variable | Where it comes from |
 |---|---|
@@ -61,7 +85,7 @@ Copy `.env.example` to `.env.local` and fill it in:
 | `SUPABASE_SECRET_KEY` | Supabase secret key (server only) |
 | `ALLOWED_EMAILS` | Google accounts allowed to sign in, comma-separated |
 
-### 4. Run it
+### Run locally
 
 ```bash
 npm install
@@ -69,10 +93,6 @@ npm run dev
 ```
 
 Open http://localhost:3000.
-
-### 5. Deploy
-
-Import the repository at [vercel.com/new](https://vercel.com/new), add the same environment variables, and deploy. Then add the Vercel address to Supabase's redirect URLs (step 2.6).
 
 ## Security
 
