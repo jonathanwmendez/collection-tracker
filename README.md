@@ -74,7 +74,7 @@ Paste [`claude/SETUP.md`](claude/SETUP.md) into a new Claude conversation, after
 ### 4. Vercel
 
 1. At [vercel.com](https://vercel.com), **Add New > Project** and import this repository.
-2. Add the environment variables below, then deploy. If Claude created the project in step 1, it already added the Supabase URL and publishable key, `ADMIN_EMAILS`, and `CRON_SECRET`: skip step 1, add the other three (`SUPABASE_SECRET_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`), and redeploy. Note the address, like `https://collection-tracker-xxxx.vercel.app`.
+2. Add the environment variables below, then deploy. If Claude created the project in setup step 1, skip 4.1. Claude already added the Supabase URL and publishable key, `ADMIN_EMAILS`, and `CRON_SECRET`, so add the other three (`SUPABASE_SECRET_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`), and redeploy. Note the address, like `https://collection-tracker-xxxx.vercel.app`.
 3. Back in the Google client from step 3.5, add that address under **Authorized JavaScript origins**.
 
 | Variable | Value |
