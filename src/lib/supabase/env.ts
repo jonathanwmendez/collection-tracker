@@ -20,10 +20,8 @@ export function isAllowedEmail(email: string | null | undefined): boolean {
  * Google access requested at sign-in:
  * - spreadsheets: read and update the Collection Tracker sheet
  * - drive.readonly: show the photos Collection Intake saved to Drive
- * - drive.file: save new photos the app uploads itself
  */
 export const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/spreadsheets",
   "https://www.googleapis.com/auth/drive.readonly",
-  "https://www.googleapis.com/auth/drive.file",
 ].join(" ");

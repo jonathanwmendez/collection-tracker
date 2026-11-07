@@ -1,0 +1,550 @@
+<title>Collection Intake</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one phone-first column. Colors mirror the Collection Tracker sheet: navy = you fill in, clay = Claude fills in, gray = automatic. */
+:root{
+  --bg:#F3F5F8; --surface:#FFFFFF; --ink:#16202E; --muted:#5B6575; --line:#DCE1E8;
+  --primary:#1F3864; --primary-ink:#FFFFFF; --primary-soft:#E4EAF5; --link:#1F3864;
+  --clay:#D97757; --clay-soft:#F9E4DC; --clay-ink:#8A3B22;
+  --ok:#2F7D4F; --ok-soft:#E3F2E8; --warn:#8A5D00; --warn-soft:#FBF0D3; --bad:#B3261E; --bad-soft:#FBE3E1;
+  --font:"Roboto",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+  --mono:"Roboto Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F131A; --surface:#18202B; --ink:#E7EBF1; --muted:#9AA4B2; --line:#2A3442;
+  --primary:#4A6FB5; --primary-ink:#FFFFFF; --primary-soft:#1E2A40; --link:#9DB6E8;
+  --clay:#E08A6D; --clay-soft:#3A241C; --clay-ink:#F2B49C;
+  --ok:#6CC28F; --ok-soft:#17301F; --warn:#E2B54D; --warn-soft:#33290F; --bad:#F28B82; --bad-soft:#3A1A18;
+  color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0F131A; --surface:#18202B; --ink:#E7EBF1; --muted:#9AA4B2; --line:#2A3442;
+  --primary:#4A6FB5; --primary-ink:#FFFFFF; --primary-soft:#1E2A40; --link:#9DB6E8;
+  --clay:#E08A6D; --clay-soft:#3A241C; --clay-ink:#F2B49C;
+  --ok:#6CC28F; --ok-soft:#17301F; --warn:#E2B54D; --warn-soft:#33290F; --bad:#F28B82; --bad-soft:#3A1A18;
+  color-scheme:dark;}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.5}
+.wrap{max-width:660px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:20px}
+header{display:flex;flex-direction:column;gap:6px}
+h1{font-size:24px;font-weight:700;margin:0;letter-spacing:-.01em;text-wrap:balance}
+h2{font-size:13px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0}
+.links{display:flex;flex-wrap:wrap;gap:14px;font-size:14px}
+a{color:var(--link);text-underline-offset:2px}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:10px;height:10px;border-radius:2px;display:inline-block}
+.drop{border:1.5px dashed var(--line);border-radius:14px;background:var(--surface);padding:22px 18px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
+.drop.over{border-color:var(--primary);background:var(--primary-soft)}
+.drop p{margin:0;color:var(--muted);font-size:14px;max-width:44ch}
+button,.btn{font:inherit;font-weight:500;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:10px 16px;min-height:44px;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+button:disabled{opacity:.55;cursor:default}
+.primary{background:var(--primary);color:var(--primary-ink);border-color:var(--primary)}
+.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+.big{font-size:16px;padding:12px 22px}
+.banner{border-radius:10px;padding:10px 14px;font-size:14px;background:var(--warn-soft);color:var(--warn)}
+.banner[data-kind="bad"]{background:var(--bad-soft);color:var(--bad)}
+.queue{display:flex;flex-direction:column;gap:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.thumbs{display:flex;gap:8px;flex-wrap:wrap}
+.thumbs img{width:76px;height:76px;object-fit:cover;border-radius:8px;border:1px solid var(--line);max-width:100%;transition:transform .15s ease}
+@media (prefers-reduced-motion: reduce){.thumbs img{transition:none}}
+.thumb{margin:0;display:flex;flex-direction:column;align-items:center;gap:6px}
+.rot{min-height:32px;padding:4px 10px;font-size:12px}
+.state{font-size:14px;color:var(--muted);display:flex;align-items:center;gap:8px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--clay);animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.25}}
+@media (prefers-reduced-motion: reduce){.dot{animation:none}}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
+@media (max-width:480px){.grid{grid-template-columns:minmax(0,1fr)}}
+.full{grid-column:1/-1}
+label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:500;color:var(--muted);min-width:0}
+input,select,textarea{font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;min-width:0}
+textarea{min-height:64px;resize:vertical}
+.clay input{background:var(--clay-soft);border-color:var(--clay);color:var(--clay-ink);font-family:var(--mono);font-weight:500}
+.clay span.k{color:var(--clay-ink)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.pill{font-size:12px;font-weight:500;border-radius:999px;padding:3px 10px;background:var(--primary-soft);color:var(--ink)}
+.pill.high{background:var(--ok-soft);color:var(--ok)}
+.pill.medium{background:var(--warn-soft);color:var(--warn)}
+.pill.low{background:var(--bad-soft);color:var(--bad)}
+.note{font-size:13px;border-radius:8px;padding:8px 10px;background:var(--warn-soft);color:var(--warn)}
+.note.info{background:var(--primary-soft);color:var(--ink)}
+.est{font-size:12px;color:var(--muted)}
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.steps li{display:flex;gap:8px;align-items:baseline}
+.steps li::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:var(--line);transform:translateY(-1px)}
+.steps li.done::before{background:var(--ok)}
+.steps li.doing::before{background:var(--clay)}
+.steps li.fail::before{background:var(--bad)}
+.err{font-size:14px;color:var(--bad)}
+.recent{display:flex;flex-direction:column;gap:0;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.ritem{display:flex;gap:12px;justify-content:space-between;align-items:center;padding:12px 14px;border-top:1px solid var(--line);flex-wrap:wrap}
+.ritem:first-child{border-top:0}
+.ritem .t{min-width:0;flex:1 1 220px}
+.ritem .t b{font-weight:500;display:block;overflow-wrap:anywhere}
+.ritem .t small{color:var(--muted)}
+.price{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:14px}
+.price.pending{color:var(--clay-ink)}
+.price.ok{color:var(--ok)}
+.empty{padding:16px 14px;color:var(--muted);font-size:14px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Collection Intake</h1>
+    <div class="links">
+      <a href="https://docs.google.com/spreadsheets/d/{{SHEET_ID}}/edit" target="_blank" rel="noopener">Open the sheet</a>
+      <a href="https://drive.google.com/drive/folders/{{PHOTOS_FOLDER_ID}}" target="_blank" rel="noopener">Open photo folders</a>
+    </div>
+    <div class="legend" aria-label="Color key">
+      <span><i class="sw" style="background:var(--primary)"></i>You check</span>
+      <span><i class="sw" style="background:var(--clay)"></i>Claude estimates</span>
+      <span><i class="sw" style="background:var(--muted)"></i>Filled in later</span>
+    </div>
+  </header>
+
+  <div id="banners"></div>
+
+  <section class="drop" id="drop" aria-label="Add photos">
+    <p>One photo per item. For a card, add the back to the same item after it appears.</p>
+    <button class="primary big" id="pick" type="button">Add photos</button>
+    <input id="file" class="sr" type="file" accept="image/*" multiple>
+  </section>
+
+  <section class="queue" id="queue" aria-live="polite"></section>
+
+  <section style="display:flex;flex-direction:column;gap:10px">
+    <div class="row" style="justify-content:space-between">
+      <h2>Recently added</h2>
+      <button class="ghost" id="refreshAll" type="button">Check prices</button>
+    </div>
+    <div class="recent" id="recent"><div class="empty">Items you approve show up here with their verified price once the price check finishes.</div></div>
+  </section>
+</div>
+
+<script>
+(() => {
+const SHEET = "{{SHEET_ID}}";
+const TRIGGER = "{{PRICE_CHECK_TASK_ID}}";
+const CARD_COND = ["NM","LP","MP","HP","DMG"];
+const PAPER_COND = ["Mint","Near Mint","Very Good","Good","Fair","Poor"];
+const TAIL = ["@mv","@auto","@lc","@auto","@status","@photo","@notes"];
+const TABS = {
+  "Sports Cards": {folder:"{{FOLDER_SPORTS_CARDS}}", cond:["Raw","Graded"],
+    cols:["Player","Year","Brand / Set","Card #","Parallel / Variant","@cond","Grade","@qty",...TAIL]},
+  "Magic: The Gathering": {folder:"{{FOLDER_MAGIC}}", cond:CARD_COND,
+    cols:["Card Name","Set","Collector #","Finish","@cond","@qty",...TAIL], opts:{"Finish":["Non-foil","Foil","Etched"]}},
+  "Yu-Gi-Oh!": {folder:"{{FOLDER_YUGIOH}}", cond:CARD_COND,
+    cols:["Card Name","Set","Set Code","Rarity","Edition","@cond","@qty",...TAIL], opts:{"Edition":["1st Edition","Unlimited","Limited Edition"]}},
+  "Pokémon": {folder:"{{FOLDER_POKEMON}}", cond:CARD_COND,
+    cols:["Card Name","Set","Card #","Rarity","Variant","@cond","@qty",...TAIL], opts:{"Variant":["Non-Holo","Holo","Reverse Holo","1st Edition","Shadowless"]}},
+  "Figures": {folder:"{{FOLDER_FIGURES}}", cond:["In Box","Loose","Opened"],
+    cols:["Name","Line / Brand","Year","@cond","@qty",...TAIL]},
+  "Magazines": {folder:"{{FOLDER_MAGAZINES}}", cond:PAPER_COND,
+    cols:["Title","Issue","Date","Cover / Feature","@cond","@qty",...TAIL]},
+  "Newspapers": {folder:"{{FOLDER_NEWSPAPERS}}", cond:PAPER_COND,
+    cols:["Newspaper","Date","Headline","@cond","@qty",...TAIL]},
+  "Ornaments": {folder:"{{FOLDER_ORNAMENTS}}", cond:["In Box","No Box","Damaged Box"],
+    cols:["Name","Brand / Series","Year","@cond","@qty",...TAIL]},
+  "Other": {folder:"{{FOLDER_OTHER}}", cond:["New","Like New","Used","In Box","Loose"],
+    cols:["Item","Type","Year","@cond","@qty",...TAIL]},
+};
+const STATUSES = ["Keep","Sell","Listed","Sold"];
+const L = i => String.fromCharCode(65 + i);
+const fieldsOf = tab => TABS[tab].cols.filter(c => !c.startsWith("@"));
+const colOf = (tab, key) => L(TABS[tab].cols.indexOf(key));
+
+let sample = null, mcp = null, fileArgs = false, imgMax = 4;
+let seq = 0;
+const items = [];
+
+// ---------- tiny DOM helper ----------
+function h(tag, attrs, ...kids){
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})){
+    if (v == null || v === false) continue;
+    if (k === "class") el.className = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (k === "value") el.value = v;
+    else el.setAttribute(k, v === true ? "" : v);
+  }
+  for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid instanceof Node ? kid : String(kid));
+  return el;
+}
+
+// ---------- banners ----------
+function banner(text, kind){
+  const el = h("div", {class:"banner", "data-kind":kind || ""}, text);
+  document.getElementById("banners").append(el);
+}
+
+// ---------- capabilities ----------
+(async () => {
+  sample = await claude.use("sample");
+  if (!sample) banner("This page can't reach Claude here, so it can't identify items. Open it from claude.ai or the Claude app.", "bad");
+  else {
+    const lim = await sample.limits().catch(() => null);
+    if (!lim?.images) { banner("This view can't send photos to Claude. Open the page in the Claude app or on claude.ai.", "bad"); sample = null; }
+    else imgMax = lim.images.maxCount || 4;
+  }
+})();
+(async () => {
+  mcp = await claude.use("mcp");
+  if (!mcp) { banner("Google Drive and Sheets aren't reachable from this view, so approved items can't be saved yet. Open the page from claude.ai or the Claude app."); return; }
+  const lt = await mcp.listTools().catch(() => null);
+  fileArgs = !!lt?.fileArgs;
+})();
+
+// ---------- error copy ----------
+function mcpWhy(e){
+  const s = e?.server || "the connector";
+  switch (e?.code){
+    case "needs_reauth": return `Reconnect ${s} in claude.ai Settings → Connectors, then tap Approve again.`;
+    case "server_not_connected": return `Add the ${s} connector in claude.ai Settings → Connectors, then tap Approve again.`;
+    case "selection_required": return `Choose which ${s} account to use when claude.ai asks, then tap Approve again.`;
+    case "approval_required": case "not_in_manifest": return `This page needs your OK to use ${s}. Tap Approve again and allow it.`;
+    case "blocked_by_policy": return `Your organization blocks this ${s} action.`;
+    case "server_unavailable": return `${s} isn't responding right now. Wait a minute and try again.`;
+    case "tool_error": return `${s} reported a problem: ${String(e.message || "").slice(0, 180)}`;
+    case "not_granted": case "capability_disabled": case "capability_removed": return "Connectors aren't available in this view. Open the page in the Claude app or on claude.ai.";
+    default: return `${s} didn't finish (${e?.code || "unknown error"}). Check the sheet before trying again.`;
+  }
+}
+function sampleWhy(e){
+  switch (e?.code){
+    case "not_granted": return "Allow this page to use Claude when asked, then tap Identify again.";
+    case "rate_limited": return "Claude is busy or you've hit a usage limit. Try again in a little while.";
+    case "image_rejected": return "That photo couldn't be read. Try a JPEG or PNG under 20 MB.";
+    case "invalid_json": return "Claude's answer came back in the wrong shape. Tap Identify again.";
+    case "refused": return "Claude couldn't identify this photo. Try a clearer shot.";
+    case "session_expired": return "Your Claude session expired. Sign in again.";
+    case "cancelled": return "Stopped.";
+    default: return `Identification failed (${e?.code || "unknown error"}). Tap Identify again.`;
+  }
+}
+
+// ---------- images ----------
+// Applies the camera's rotation tag (so the saved file is upright everywhere), then any extra turn from the Rotate button.
+async function toJpeg(file, maxSide, quality, rot = 0){
+  let src;
+  try { src = await createImageBitmap(file, {imageOrientation:"from-image"}); }
+  catch { src = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = URL.createObjectURL(file); }); }
+  const w = src.width, hgt = src.height, k = Math.min(1, maxSide / Math.max(w, hgt));
+  const sw = Math.round(w * k), sh = Math.round(hgt * k);
+  const turn = ((rot % 360) + 360) % 360, sideways = turn === 90 || turn === 270;
+  const c = document.createElement("canvas"); c.width = sideways ? sh : sw; c.height = sideways ? sw : sh;
+  const g = c.getContext("2d");
+  g.translate(c.width / 2, c.height / 2); g.rotate(turn * Math.PI / 180);
+  g.drawImage(src, -sw / 2, -sh / 2, sw, sh);
+  return await new Promise(r => c.toBlob(r, "image/jpeg", quality));
+}
+function toBase64(blob){
+  return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(",")[1]); fr.onerror = rej; fr.readAsDataURL(blob); });
+}
+
+// ---------- adding photos ----------
+const fileInput = document.getElementById("file");
+document.getElementById("pick").onclick = () => fileInput.click();
+fileInput.onchange = () => { addFiles(fileInput.files); fileInput.value = ""; };
+const drop = document.getElementById("drop");
+drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+drop.addEventListener("drop", e => { e.preventDefault(); drop.classList.remove("over"); addFiles(e.dataTransfer.files); });
+
+function addFiles(list){
+  for (const f of list){
+    if (!f.type.startsWith("image/")) continue;
+    const it = {id: ++seq, photos:[f], rot:[0], state:"queued", draft:null, error:"", steps:[]};
+    items.push(it); render(it); identify(it);
+  }
+}
+
+// ---------- identification ----------
+let running = 0; const waiting = [];
+function slot(){ return new Promise(r => { if (running < 2){ running++; r(); } else waiting.push(r); }); }
+function release(){ const n = waiting.shift(); if (n) n(); else running--; }
+
+function prompt(){
+  const spec = {};
+  for (const [t, c] of Object.entries(TABS)) spec[t] = {fields: fieldsOf(t), conditions: c.cond, ...(c.opts ? {suggested_values: c.opts} : {})};
+  return `You identify collectibles from photos for a collection spreadsheet. The photos show ONE item (several photos are different angles or the front and back of the same item).
+
+Pick the tab that fits best and fill in its fields. Tabs, their fields, and allowed condition values:
+${JSON.stringify(spec)}
+
+Rules:
+- Read every visible identifier: set names, card numbers, set codes, stock numbers, years, brands, grades on slabs.
+- Use "" for any field you can't determine. Never invent a card number or year.
+- Condition must be one of the tab's allowed values. Judge it from what is visible and say in "notes" what you based it on.
+- "estimate" is your best guess of the current market value for ONE unit in USD, based on typical recent sold prices for this exact item and condition. It will be verified against real sales later, so keep it realistic, not optimistic.
+- If none of the tabs fits well, put the item in "Other" and suggest a better category name in "newCategory".
+- Plain wording. No em dashes.
+
+Reply with only this JSON object:
+{"tab": "<tab name exactly>", "fields": {"<field>": "<value>"}, "condition": "<value>", "qty": 1, "estimate": 0, "range": [0, 0], "confidence": "high|medium|low", "notes": "<short: identifiers seen, visible wear>", "uncertain": "<what you could not confirm, or empty>", "newCategory": "<or empty>"}`;
+}
+
+async function identify(it){
+  it.state = "identifying"; it.error = ""; render(it);
+  if (!sample){ it.state = "idfail"; it.error = "Claude isn't available in this view, so this item can't be identified here."; render(it); return; }
+  await slot();
+  try {
+    const imgs = await Promise.all(it.photos.slice(0, imgMax).map((f, i) => it.rot[i] ? toJpeg(f, 2000, 0.9, it.rot[i]) : f));
+    const out = await sample.json(prompt(), {images: imgs, modelTier: "default"});
+    const tab = TABS[out?.tab] ? out.tab : "Other";
+    const fields = {};
+    for (const f of fieldsOf(tab)) fields[f] = String(out?.fields?.[f] ?? "");
+    const cond = TABS[tab].cond.includes(out?.condition) ? out.condition : TABS[tab].cond[0];
+    it.draft = {
+      tab, fields, cond,
+      qty: Math.max(1, parseInt(out?.qty, 10) || 1),
+      estimate: Number(out?.estimate) > 0 ? Math.round(Number(out.estimate) * 100) / 100 : "",
+      range: Array.isArray(out?.range) ? out.range.map(Number).filter(n => n >= 0) : [],
+      confidence: ["high","medium","low"].includes(out?.confidence) ? out.confidence : "medium",
+      notes: String(out?.notes || ""), uncertain: String(out?.uncertain || ""), newCategory: String(out?.newCategory || ""),
+      status: "Keep",
+    };
+    it.state = "draft";
+  } catch (e){
+    it.state = "idfail"; it.error = sampleWhy(e);
+  } finally { release(); }
+  render(it);
+}
+
+// ---------- rendering ----------
+const queue = document.getElementById("queue");
+function render(it){
+  let card = document.getElementById("item-" + it.id);
+  const fresh = h("article", {class:"card", id:"item-" + it.id, "aria-label":"Item " + it.id}, ...cardBody(it));
+  if (card) card.replaceWith(fresh); else queue.prepend(fresh);
+}
+function thumbs(it, editable){
+  return h("div", {class:"thumbs"}, it.photos.map((f, i) => h("figure", {class:"thumb"},
+    h("img", {src: (f._url ||= URL.createObjectURL(f)), alt: `Photo ${i + 1} of the item`, style: `transform:rotate(${it.rot[i] || 0}deg)`}),
+    editable ? h("button", {type:"button", class:"rot", "aria-label": `Rotate photo ${i + 1} clockwise`,
+      onclick: () => { it.rot[i] = ((it.rot[i] || 0) + 90) % 360; render(it); }}, "Rotate") : null)));
+}
+
+function cardBody(it){
+  if (it.state === "queued" || it.state === "identifying")
+    return [thumbs(it), h("div", {class:"state"}, h("i", {class:"dot"}), "Identifying the item. This usually takes 15 to 60 seconds.")];
+  if (it.state === "idfail")
+    return [thumbs(it), h("div", {class:"err"}, it.error),
+      h("div", {class:"row"}, h("button", {type:"button", onclick: () => identify(it)}, "Identify again"),
+        h("button", {type:"button", class:"ghost", onclick: () => remove(it)}, "Discard"))];
+  if (it.state === "saving" || it.state === "saved" || it.state === "savefail")
+    return [thumbs(it), h("b", {}, it.draft.fields[fieldsOf(it.draft.tab)[0]] || "Item"),
+      h("ul", {class:"steps"}, it.steps.map(s => h("li", {class:s.state}, s.text))),
+      it.error ? h("div", {class:"err"}, it.error) : null,
+      it.state === "savefail" ? h("div", {class:"row"},
+        h("button", {type:"button", class:"primary", onclick: () => approve(it)}, "Try again"),
+        h("button", {type:"button", class:"ghost", onclick: () => { it.state = "draft"; it.error = ""; render(it); }}, "Back to edit")) : null,
+      it.state === "saved" ? h("div", {class:"row"}, h("button", {type:"button", class:"ghost", onclick: () => remove(it)}, "Dismiss")) : null];
+  return draftForm(it);
+}
+
+function draftForm(it){
+  const d = it.draft, cfg = TABS[d.tab], pre = `i${it.id}-`;
+  const tabSel = h("select", {id: pre + "tab", onchange: e => switchTab(it, e.target.value)},
+    Object.keys(TABS).map(t => h("option", {value:t, selected: t === d.tab}, t)));
+  const fieldEls = fieldsOf(d.tab).map((f, n) => {
+    const listId = cfg.opts?.[f] ? pre + "dl" + n : null;
+    return h("label", {class: n === 0 ? "full" : ""}, f,
+      h("input", {id: pre + "f" + n, value: d.fields[f] || "", list: listId, autocomplete:"off",
+        oninput: e => { d.fields[f] = e.target.value; }}),
+      listId ? h("datalist", {id:listId}, cfg.opts[f].map(o => h("option", {value:o}))) : null);
+  });
+  const condSel = h("select", {id: pre + "cond", onchange: e => { d.cond = e.target.value; }},
+    cfg.cond.map(c => h("option", {value:c, selected: c === d.cond}, c)));
+  const range = d.range.length === 2 && d.range[1] > 0 ? `Likely range $${d.range[0]} to $${d.range[1]}.` : "";
+  return [
+    thumbs(it, true),
+    it.error ? h("div", {class:"err"}, it.error) : null,
+    h("div", {class:"row"}, h("span", {class:"pill " + d.confidence}, `${d.confidence[0].toUpperCase() + d.confidence.slice(1)} confidence`)),
+    d.uncertain ? h("div", {class:"note"}, "Check this: " + d.uncertain) : null,
+    d.newCategory ? h("div", {class:"note info"}, `Suggested new category: ${d.newCategory}. It's going in Other for now. Ask Claude in chat to add the tab if you want it.`) : null,
+    h("div", {class:"grid"},
+      h("label", {class:"full"}, "Tab", tabSel),
+      ...fieldEls,
+      h("label", {}, "Condition", condSel),
+      h("label", {}, "Qty", h("input", {id: pre + "qty", type:"number", min:"1", step:"1", inputmode:"numeric", value:String(d.qty), oninput: e => { d.qty = e.target.value; }})),
+      h("label", {class:"clay"}, h("span", {class:"k"}, "Estimated value (each)"),
+        h("input", {id: pre + "est", type:"number", min:"0", step:"0.01", inputmode:"decimal", value:String(d.estimate), oninput: e => { d.estimate = e.target.value; }})),
+      h("label", {}, "Status", h("select", {id: pre + "status", onchange: e => { d.status = e.target.value; }},
+        STATUSES.map(s => h("option", {value:s, selected: s === d.status}, s)))),
+      h("div", {class:"est full"}, `${range} Verified against real sales after you approve.`),
+      h("label", {class:"full"}, "Notes", h("textarea", {id: pre + "notes", oninput: e => { d.notes = e.target.value; }}, d.notes)),
+    ),
+    h("div", {class:"row"},
+      h("button", {type:"button", class:"primary", onclick: () => approve(it)}, "Approve and add"),
+      h("button", {type:"button", onclick: () => addMore(it)}, "Add another photo"),
+      h("button", {type:"button", class:"ghost", onclick: () => identify(it)}, "Identify again"),
+      h("button", {type:"button", class:"ghost", onclick: () => remove(it)}, "Discard")),
+  ];
+}
+
+function switchTab(it, tab){
+  const old = it.draft.fields, fields = {};
+  const oldFirst = Object.values(old)[0] || "";
+  fieldsOf(tab).forEach((f, n) => { fields[f] = old[f] ?? (n === 0 ? oldFirst : ""); });
+  it.draft.tab = tab; it.draft.fields = fields;
+  if (!TABS[tab].cond.includes(it.draft.cond)) it.draft.cond = TABS[tab].cond[0];
+  render(it);
+}
+function addMore(it){
+  const inp = h("input", {type:"file", accept:"image/*", multiple:true, class:"sr"});
+  inp.onchange = () => { for (const f of inp.files) if (f.type.startsWith("image/")) { it.photos.push(f); it.rot.push(0); } inp.remove(); render(it); };
+  document.body.append(inp); inp.click();
+}
+function remove(it){
+  const i = items.indexOf(it); if (i >= 0) items.splice(i, 1);
+  document.getElementById("item-" + it.id)?.remove();
+}
+
+// ---------- approve: Drive photo, Sheets row, price check ----------
+const clean = s => String(s || "").replace(/[\\/:*?"<>|#%]+/g, " ").replace(/\s+/g, " ").trim();
+const safeCell = v => typeof v === "string" && /^[=+@]/.test(v) ? "'" + v : v;
+
+async function approve(it){
+  const d = it.draft;
+  const name = (d.fields[fieldsOf(d.tab)[0]] || "").trim();
+  if (!name){ it.error = `Add a ${fieldsOf(d.tab)[0]} before approving.`; it.state = "draft"; render(it); return; }
+  if (!mcp){ it.state = "savefail"; it.error = "Google Drive and Sheets aren't reachable from this view. Open the page in the Claude app or on claude.ai."; it.steps = []; render(it); return; }
+  const cfg = TABS[d.tab];
+  const done = it.done || (it.done = {});
+  it.state = "saving"; it.error = "";
+  it.steps = [
+    {key:"photo", text: done.photoUrl ? "Photo saved to Drive" : `Saving ${it.photos.length > 1 ? "photos" : "photo"} to the ${d.tab} folder`, state: done.photoUrl ? "done" : "doing"},
+    {key:"row", text: done.row ? `Added to ${d.tab}, row ${done.row}` : `Adding the row to ${d.tab}`, state: done.row ? "done" : ""},
+    {key:"price", text:"Starting the price check", state:""},
+  ];
+  render(it);
+  const step = (k, state, text) => { const s = it.steps.find(x => x.key === k); s.state = state; if (text) s.text = text; render(it); };
+
+  // 1. photos
+  if (!done.photoUrl){
+    try {
+      const yr = d.fields["Year"] || d.fields["Date"] || "";
+      const base = [clean(d.tab), clean(name), clean(yr)].filter(Boolean).join(" - ");
+      const urls = [];
+      for (let i = 0; i < it.photos.length; i++){
+        const title = base + (i ? ` (${i + 1})` : "") + ".jpg";
+        let content;
+        if (fileArgs){
+          const blob = await toJpeg(it.photos[i], 2400, 0.88, it.rot[i]);
+          content = {$file: {data: blob, name: title, type: "image/jpeg"}};
+        } else {
+          let blob = await toJpeg(it.photos[i], 1400, 0.8, it.rot[i]);
+          if (blob.size > 700000) blob = await toJpeg(it.photos[i], 1100, 0.72, it.rot[i]);
+          content = await toBase64(blob);
+        }
+        const res = await mcp.callTool("Google Drive", "create_file",
+          {title, parentId: cfg.folder, contentMimeType: "image/jpeg", disableConversionToGoogleType: true, base64Content: content});
+        const p = res?.payload || {};
+        urls.push(p.viewUrl || (p.id ? `https://drive.google.com/file/d/${p.id}/view` : ""));
+      }
+      done.photoUrl = urls[0] || "none";
+      step("photo", "done", `Saved ${it.photos.length > 1 ? it.photos.length + " photos" : "photo"} as “${base}.jpg”`);
+    } catch (e){
+      step("photo", "fail"); it.state = "savefail";
+      it.error = e?.code ? mcpWhy(e) : "The photo couldn't be prepared for upload. Try a different photo.";
+      render(it); return;
+    }
+  }
+
+  // 2. sheet row
+  if (!done.row){
+    step("row", "doing");
+    try {
+      const got = await mcp.callTool("Google Sheets", "get_values", {spreadsheetId: SHEET, range: `'${d.tab}'!A:A`}, {cache: false});
+      const rowNum = ((got?.payload?.values) || []).length + 1;
+      const est = Number(d.estimate) > 0 ? Math.round(Number(d.estimate) * 100) / 100 : "";
+      const tag = est !== "" ? `[Estimate $${est}, not verified yet] ` : "[No estimate yet] ";
+      const values = cfg.cols.map(c => {
+        switch (c){
+          case "@cond": return d.cond;
+          case "@qty": return Math.max(1, parseInt(d.qty, 10) || 1);
+          case "@mv": return est;
+          case "@auto": return null;
+          case "@lc": return "";
+          case "@status": return d.status;
+          case "@photo": return done.photoUrl && done.photoUrl !== "none" ? `=HYPERLINK("${done.photoUrl}","Photo")` : "";
+          case "@notes": return tag + d.notes.trim();
+          default: return safeCell((d.fields[c] || "").trim());
+        }
+      });
+      await mcp.callTool("Google Sheets", "update_values",
+        {spreadsheetId: SHEET, range: `'${d.tab}'!A${rowNum}:${L(cfg.cols.length - 1)}${rowNum}`, values: [values]});
+      done.row = rowNum;
+      step("row", "done", `Added to ${d.tab}, row ${rowNum}`);
+      remember({tab: d.tab, row: rowNum, name, estimate: est, at: Date.now()});
+    } catch (e){
+      step("row", "fail"); it.state = "savefail";
+      it.error = mcpWhy(e) + (e?.code === "server_unavailable" || e?.code === "upstream_error" ? " The row may have been added anyway, so check the sheet first." : "");
+      render(it); return;
+    }
+  }
+
+  // 3. price check
+  step("price", "doing");
+  try {
+    await mcp.callTool("Claude Code Remote", "fire_trigger",
+      {trigger_id: TRIGGER, text: `New item to price first: '${d.tab}' row ${done.row} (${name}).`});
+    step("price", "done", "Price check started. The verified price usually lands within a few minutes.");
+  } catch (e){
+    step("price", "done", "The price check couldn't start now. It will run tonight at 3:30 AM.");
+  }
+  it.state = "saved"; render(it);
+}
+
+// ---------- recently added ----------
+const KEY = "intake-recent-v1";
+function loadRecent(){ try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { return []; } }
+function saveRecent(list){ try { localStorage.setItem(KEY, JSON.stringify(list.slice(0, 30))); } catch {} }
+let recent = loadRecent();
+function remember(r){ recent = [r, ...recent.filter(x => !(x.tab === r.tab && x.row === r.row))]; saveRecent(recent); renderRecent(); }
+
+function renderRecent(){
+  const box = document.getElementById("recent");
+  box.replaceChildren();
+  if (!recent.length){ box.append(h("div", {class:"empty"}, "Items you approve show up here with their verified price once the price check finishes.")); return; }
+  for (const r of recent){
+    let priceEl;
+    if (r.verified) priceEl = h("span", {class:"price ok"}, `${r.value} verified`);
+    else if (r.checkErr) priceEl = h("span", {class:"price"}, r.checkErr);
+    else priceEl = h("span", {class:"price pending"}, r.estimate !== "" && r.estimate != null ? `$${Number(r.estimate).toFixed(2)} estimate` : "Waiting for a price");
+    box.append(h("div", {class:"ritem"},
+      h("div", {class:"t"}, h("b", {}, r.name), h("small", {}, `${r.tab}, row ${r.row}${r.detail ? " · " + r.detail : ""}`)),
+      priceEl));
+  }
+}
+renderRecent();
+
+document.getElementById("refreshAll").onclick = async (ev) => {
+  const btn = ev.currentTarget;
+  if (!mcp){ banner("Connectors aren't available in this view, so prices can't be checked here."); return; }
+  btn.disabled = true; btn.textContent = "Checking…";
+  for (const r of recent.slice(0, 15)){
+    const cols = TABS[r.tab]?.cols; if (!cols) continue;
+    try {
+      const res = await mcp.callTool("Google Sheets", "get_values",
+        {spreadsheetId: SHEET, range: `'${r.tab}'!A${r.row}:${L(cols.length - 1)}${r.row}`}, {cache: false});
+      const row = res?.payload?.values?.[0] || [];
+      const mv = row[cols.indexOf("@mv")] || "", lc = row[cols.indexOf("@lc")] || "", notes = row[cols.indexOf("@notes")] || "";
+      r.checkErr = "";
+      if ((row[0] || "").trim() !== r.name.trim()){ r.verified = false; r.checkErr = "Row changed in the sheet"; }
+      else if (lc){ r.verified = true; r.value = mv || "No value"; const m = notes.match(/(median of \d+ sold[^.]*|no reliable sold data)/i); r.detail = m ? m[1] : `checked ${lc}`; }
+      else { r.verified = false; r.detail = "price check pending"; }
+    } catch (e){ r.checkErr = e?.code === "server_unavailable" ? "Sheets didn't respond" : "Couldn't check"; }
+  }
+  saveRecent(recent); renderRecent();
+  btn.disabled = false; btn.textContent = "Check prices";
+};
+})();
+</script>
+

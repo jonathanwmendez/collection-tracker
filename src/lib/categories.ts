@@ -9,8 +9,6 @@ export type Category = {
   conditions: string[];
   /** Suggested values for fields that have common options. */
   suggestions?: Record<string, string[]>;
-  /** Where verified prices usually come from. */
-  priceSource: "tcgplayer" | "ebay";
 };
 
 const CARD_CONDITIONS = ["NM", "LP", "MP", "HP", "DMG"];
@@ -22,7 +20,6 @@ export const CATEGORIES: Category[] = [
     slug: "sports-cards",
     fields: ["Player", "Year", "Brand / Set", "Card #", "Parallel / Variant", "Grade"],
     conditions: ["Raw", "Graded"],
-    priceSource: "ebay",
   },
   {
     name: "Magic: The Gathering",
@@ -30,7 +27,6 @@ export const CATEGORIES: Category[] = [
     fields: ["Card Name", "Set", "Collector #", "Finish"],
     conditions: CARD_CONDITIONS,
     suggestions: { Finish: ["Non-foil", "Foil", "Etched"] },
-    priceSource: "tcgplayer",
   },
   {
     name: "Yu-Gi-Oh!",
@@ -38,7 +34,6 @@ export const CATEGORIES: Category[] = [
     fields: ["Card Name", "Set", "Set Code", "Rarity", "Edition"],
     conditions: CARD_CONDITIONS,
     suggestions: { Edition: ["1st Edition", "Unlimited", "Limited Edition"] },
-    priceSource: "tcgplayer",
   },
   {
     name: "Pokémon",
@@ -46,42 +41,36 @@ export const CATEGORIES: Category[] = [
     fields: ["Card Name", "Set", "Card #", "Rarity", "Variant"],
     conditions: CARD_CONDITIONS,
     suggestions: { Variant: ["Non-Holo", "Holo", "Reverse Holo", "1st Edition", "Shadowless"] },
-    priceSource: "tcgplayer",
   },
   {
     name: "Figures",
     slug: "figures",
     fields: ["Name", "Line / Brand", "Year"],
     conditions: ["In Box", "Loose", "Opened"],
-    priceSource: "ebay",
   },
   {
     name: "Magazines",
     slug: "magazines",
     fields: ["Title", "Issue", "Date", "Cover / Feature"],
     conditions: PAPER_CONDITIONS,
-    priceSource: "ebay",
   },
   {
     name: "Newspapers",
     slug: "newspapers",
     fields: ["Newspaper", "Date", "Headline"],
     conditions: PAPER_CONDITIONS,
-    priceSource: "ebay",
   },
   {
     name: "Ornaments",
     slug: "ornaments",
     fields: ["Name", "Brand / Series", "Year"],
     conditions: ["In Box", "No Box", "Damaged Box"],
-    priceSource: "ebay",
   },
   {
     name: "Other",
     slug: "other",
     fields: ["Item", "Type", "Year"],
     conditions: ["New", "Like New", "Used", "In Box", "Loose"],
-    priceSource: "ebay",
   },
 ];
 
@@ -95,9 +84,4 @@ export function categoryByName(name: string): Category | undefined {
 /** The item's display name is its category's first field (Player, Card Name, Title, ...). */
 export function nameField(category: Category): string {
   return category.fields[0]!;
-}
-
-/** Year-like field used in photo file names, if the category has one. */
-export function yearOf(fields: Record<string, string>): string {
-  return (fields["Year"] || fields["Date"] || "").trim();
 }

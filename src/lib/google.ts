@@ -1,7 +1,5 @@
 import "server-only";
 import { createAdminClient } from "./supabase/admin";
-import { CATEGORIES } from "./categories";
-import type { SupabaseClient } from "@supabase/supabase-js";
 
 export class GoogleError extends Error {
   constructor(
@@ -13,8 +11,6 @@ export class GoogleError extends Error {
   }
 }
 
-const ROOT_FOLDER_NAME = "Collection Tracker Photos (App)";
-const FOLDER_MIME = "application/vnd.google-apps.folder";
 
 /**
  * Trades the saved refresh token for a short-lived Google access token.
@@ -82,86 +78,13 @@ export async function googleFetch(token: string, url: string, init: RequestInit 
   return res;
 }
 
-const driveFetch = (token: string, url: string, init: RequestInit) => googleFetch(token, url, init, "Google Drive");
-
 /** Downloads a Drive file the app can read (photos linked in the sheet). */
 export async function downloadDriveFile(token: string, fileId: string): Promise<ArrayBuffer> {
-  const res = await driveFetch(
+  const res = await googleFetch(
     token,
     `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`,
     {},
+    "Google Drive",
   );
   return res.arrayBuffer();
-}
-
-async function createFolder(token: string, name: string, parentId?: string): Promise<string> {
-  const res = await driveFetch(token, "https://www.googleapis.com/drive/v3/files?fields=id", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name, mimeType: FOLDER_MIME, ...(parentId ? { parents: [parentId] } : {}) }),
-  });
-  return ((await res.json()) as { id: string }).id;
-}
-
-/**
- * Makes sure the app's photo folders exist in Drive and returns the folder for a category.
- * Folder IDs are remembered in the settings table. The app can only see folders it created (drive.file).
- */
-export async function ensureCategoryFolder(
-  supabase: SupabaseClient,
-  userId: string,
-  token: string,
-  category: string,
-): Promise<string> {
-  const { data: settings } = await supabase
-    .from("settings")
-    .select("drive_root_folder_id, drive_category_folders")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  const folders = { ...((settings?.drive_category_folders as Record<string, string> | null) ?? {}) };
-  if (folders[category]) return folders[category]!;
-
-  let rootId = settings?.drive_root_folder_id as string | null | undefined;
-  if (!rootId) {
-    rootId = await createFolder(token, ROOT_FOLDER_NAME);
-    // Create every category folder up front so the Drive layout matches the sheet's tabs.
-    for (const c of CATEGORIES) folders[c.name] = await createFolder(token, c.name, rootId);
-  }
-  if (!folders[category]) folders[category] = await createFolder(token, category, rootId);
-
-  const { error } = await supabase
-    .from("settings")
-    .upsert({ user_id: userId, drive_root_folder_id: rootId, drive_category_folders: folders });
-  if (error) console.error("Couldn't save Drive folder IDs", error);
-  return folders[category]!;
-}
-
-/** Uploads a JPEG to Drive and returns its file ID and link. */
-export async function uploadPhoto(
-  token: string,
-  folderId: string,
-  name: string,
-  bytes: ArrayBuffer,
-): Promise<{ id: string; url: string }> {
-  const boundary = "ct" + crypto.randomUUID().replace(/-/g, "");
-  const meta = JSON.stringify({ name, parents: [folderId], mimeType: "image/jpeg" });
-  const head = `--${boundary}\r\ncontent-type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\ncontent-type: image/jpeg\r\n\r\n`;
-  const tail = `\r\n--${boundary}--`;
-  const body = new Blob([head, new Uint8Array(bytes), tail]);
-
-  const res = await driveFetch(
-    token,
-    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink",
-    { method: "POST", headers: { "content-type": `multipart/related; boundary=${boundary}` }, body },
-  );
-  const json = (await res.json()) as { id: string; webViewLink?: string };
-  return { id: json.id, url: json.webViewLink ?? `https://drive.google.com/file/d/${json.id}/view` };
-}
-
-/** "Figures - Michael Jordan Triple Play - 1996.jpg", safe for Drive and for synced Windows folders. */
-export function photoFileName(category: string, name: string, year: string, position: number): string {
-  const clean = (s: string) => s.replace(/[\\/:*?"<>|#%]+/g, " ").replace(/\s+/g, " ").trim();
-  const base = [clean(category), clean(name), clean(year)].filter(Boolean).join(" - ");
-  return base + (position > 0 ? ` (${position + 1})` : "") + ".jpg";
 }
