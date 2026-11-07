@@ -16,14 +16,14 @@ A Google Sheet is the main copy of the collection. Three pieces work on it:
 
 | Piece | Runs on | What it does |
 |---|---|---|
-| **Collection Intake** | A Claude artifact | Take a photo of one item, or a binder page of up to 9 cards. Claude identifies each item and estimates its value. You approve, it checks for duplicates, and it saves the photo to Drive and a row to the sheet |
+| **Collection Intake** | A Claude artifact | Take photos in a row (cards front then back, one item per photo, or a binder page of up to 9 cards), or pick them from your library. Claude identifies each item and estimates its value while you keep shooting. You approve one at a time or all ready items at once; it checks for duplicates and saves the photos to Drive and a row to the sheet |
 | **Price check** | A Claude scheduled task, nightly at 3:30 AM, plus right after each approval | Prices new rows from recent sold listings, rechecks the oldest prices past the repricing window (30 days by default) until 8:00 AM, adds PSA 9 and PSA 10 prices for ungraded cards, emails alerts for big moves, and logs each run with tokens used to a Price Log tab |
 | **This web app** | Vercel + Supabase | Syncs from the sheet every morning and whenever you open it, to browse, search, edit, analyze, and share the collection |
 
 Identifying and pricing run inside Claude, on a Claude subscription. The web app makes no paid AI calls.
 
 **App features:**
-- Collection: search, category lists with filters, item pages with full-screen photos and price history
+- Collection: search, category lists with filters, item pages with full-screen photos (cards show front and back) and price history
 - Editing saved to the sheet (each write checks it still has the right row), delete, queue for repricing, add without a photo with a duplicate check
 - Profit tracking: what you paid, what you sold for, gain so far, and realized profit
 - Value dashboard: total over time (snapshot every morning), change by category, biggest price moves, grading candidates, price upkeep, CSV export
@@ -58,7 +58,7 @@ Paste [`claude/SETUP.md`](claude/SETUP.md) into a new Claude conversation, after
 ### 2. Supabase
 
 1. Create a project at [supabase.com](https://supabase.com). Under **Security**: keep **Enable Data API** on, turn **Automatically expose new tables** off, turn **Enable automatic RLS** on.
-2. **SQL Editor:** run the files in [`supabase/migrations/`](supabase/migrations) in order, `0001` through `0006`. Skip this if Claude already ran them in step 1 with the Supabase connector.
+2. **SQL Editor:** run the files in [`supabase/migrations/`](supabase/migrations) in order, `0001` through `0007`. Skip this if Claude already ran them in step 1 with the Supabase connector.
 3. **Settings > API Keys:** copy the project URL, a publishable key, and a secret key.
 
 ### 3. Google Cloud

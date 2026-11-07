@@ -1,8 +1,8 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { CATEGORIES } from "./categories";
+import { CATEGORIES, categoryByName } from "./categories";
 import { getGoogleAccessToken } from "./google";
-import { parseRow, priceSummary, todayISO, type SheetItem } from "./sheet-format";
+import { parseRow, photoSides, priceSummary, todayISO, type SheetItem } from "./sheet-format";
 import { getTabs, readSummarySettings, readTabs, type SummaryValues } from "./sheets";
 
 export class SyncError extends Error {
@@ -24,7 +24,14 @@ export type SyncResult = {
 };
 
 type Existing = { id: string; category: string; name: string; sheet_row: number | null; market_value: string | number | null; last_checked: string | null };
-type ExistingPhoto = { id: string; item_id: string; drive_file_id: string | null; preview_path: string | null };
+type ExistingPhoto = {
+  id: string;
+  item_id: string;
+  drive_file_id: string | null;
+  preview_path: string | null;
+  position: number;
+  side: "front" | "back" | null;
+};
 
 const CHUNK = 500;
 const chunks = <T,>(list: T[]) => Array.from({ length: Math.ceil(list.length / CHUNK) }, (_, i) => list.slice(i * CHUNK, (i + 1) * CHUNK));
@@ -124,33 +131,48 @@ export async function syncCollection(supabase: SupabaseClient, userId: string): 
 
   const removed = existing.filter((e) => !used.has(e.id));
 
-  // Photos: one row per Drive file linked in the Photo column.
-  const { data: photoRows } = await supabase.from("photos").select("id, item_id, drive_file_id, preview_path").eq("user_id", userId);
+  // Photos: one row per Drive file linked in the Photo column, then the Back Photo column (cards).
+  const { data: photoRows } = await supabase
+    .from("photos")
+    .select("id, item_id, drive_file_id, preview_path, position, side")
+    .eq("user_id", userId);
   const photos = (photoRows ?? []) as ExistingPhoto[];
   const photosByItem = new Map<string, ExistingPhoto[]>();
   for (const p of photos) photosByItem.set(p.item_id, [...(photosByItem.get(p.item_id) ?? []), p]);
 
   const newPhotos: Array<Record<string, unknown>> = [];
+  const movedPhotos: Array<{ id: string; position: number; side: ExistingPhoto["side"] }> = [];
   const stalePhotos: ExistingPhoto[] = [];
   for (const s of sheetItems) {
     const id = idOf.get(s)!;
     const have = photosByItem.get(id) ?? [];
-    s.photoIds.forEach((fileId, position) => {
-      if (!have.some((p) => p.drive_file_id === fileId)) {
+    const cards = Boolean(categoryByName(s.category)?.backPhoto);
+    const wanted = photoSides(s.photoIds, s.backPhotoIds, cards);
+    wanted.forEach(({ fileId, side }, position) => {
+      const found = have.find((p) => p.drive_file_id === fileId);
+      if (!found) {
         newPhotos.push({
           item_id: id,
           user_id: userId,
           position,
+          side,
           drive_file_id: fileId,
           drive_url: `https://drive.google.com/file/d/${fileId}/view`,
         });
+      } else if (found.position !== position || found.side !== side) {
+        movedPhotos.push({ id: found.id, position, side });
       }
     });
-    for (const p of have) if (!p.drive_file_id || !s.photoIds.includes(p.drive_file_id)) stalePhotos.push(p);
+    const keep = new Set(wanted.map((w) => w.fileId));
+    for (const p of have) if (!p.drive_file_id || !keep.has(p.drive_file_id)) stalePhotos.push(p);
   }
   for (const part of chunks(newPhotos)) {
     const { error } = await supabase.from("photos").insert(part);
     if (error) console.error("Insert photos failed", error);
+  }
+  for (const m of movedPhotos) {
+    const { error } = await supabase.from("photos").update({ position: m.position, side: m.side }).eq("id", m.id);
+    if (error) console.error("Update photo failed", error);
   }
 
   // Previews for removed photos and removed items.
@@ -245,3 +267,4 @@ async function recordSnapshot(supabase: SupabaseClient, userId: string, all: She
   );
   if (error) console.error("Snapshot failed", error);
 }
+

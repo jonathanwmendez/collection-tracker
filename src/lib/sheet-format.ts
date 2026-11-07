@@ -1,7 +1,7 @@
 // Reading and writing the Collection Tracker sheet's rows. Pure functions, so they can be tested without Google.
 //
 // Each category tab has the category's fields, then Condition, Qty, Market Value (Each), Total Value (Auto),
-// Last Checked, a price link (Auto), Status, Photo, and Notes. Columns are found by header name, so the
+// Last Checked, a price link (Auto), Status, Photo, and Notes (card tabs also have Back Photo). Columns are found by header name, so the
 // app keeps working if columns move. "(Auto)" columns hold formulas and are never written.
 
 import { categoryByName, nameField, STATUSES, type Category, type Status } from "./categories";
@@ -13,6 +13,7 @@ export const COL = {
   lastChecked: "Last Checked",
   status: "Status",
   photo: "Photo",
+  backPhoto: "Back Photo",
   notes: "Notes",
   paid: "Paid (Each)",
   soldPrice: "Sold For (Each)",
@@ -37,6 +38,8 @@ export type SheetItem = {
   status: Status;
   notes: string;
   photoIds: string[];
+  /** Cards only: Drive file IDs in the Back Photo column. */
+  backPhotoIds: string[];
   valueStatus: ValueStatus;
   /** What you paid for one, what one sold for, and when (owner's columns). */
   paid: number | null;
@@ -136,6 +139,15 @@ export function driveFileIds(v: unknown): string[] {
   return [...ids];
 }
 
+/** The order photos show in: the Photo column first, then the Back Photo column. Cards label each side. */
+export function photoSides(front: string[], back: string[], cards: boolean): Array<{ fileId: string; side: "front" | "back" | null }> {
+  const out: Array<{ fileId: string; side: "front" | "back" | null }> = [];
+  const seen = new Set<string>();
+  for (const fileId of front) if (!seen.has(fileId)) { seen.add(fileId); out.push({ fileId, side: cards ? "front" : null }); }
+  for (const fileId of back) if (!seen.has(fileId)) { seen.add(fileId); out.push({ fileId, side: cards ? "back" : null }); }
+  return out;
+}
+
 /**
  * Whether the value has been checked against real sales. The scheduled price check sets Last Checked and
  * appends "Verified $X ..." or "... no reliable sold data ..." to Notes.
@@ -177,6 +189,7 @@ export function parseRow(categoryName: string, headers: Headers, cells: unknown[
     status: parseStatus(get(COL.status)),
     notes,
     photoIds: driveFileIds(get(COL.photo)),
+    backPhotoIds: driveFileIds(get(COL.backPhoto)),
     valueStatus: valueStatusOf(lastChecked, notes),
     paid: parseMoney(get(COL.paid)),
     soldPrice: parseMoney(get(COL.soldPrice)),

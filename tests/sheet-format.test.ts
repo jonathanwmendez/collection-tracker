@@ -9,6 +9,7 @@ import {
   parseDate,
   parseMoney,
   parseRow,
+  photoSides,
   priceSummary,
   readHeaders,
   safeCell,
@@ -147,4 +148,23 @@ test("reads cost, sale, and graded price columns", () => {
   assert.equal(item.psa9, null);
   const cells = itemCells(categoryByName("Figures")!, headers, { paid: 12.5, soldPrice: null, soldOn: "2026-11-01" });
   assert.deepEqual(cells.map((c) => [c.col, c.value]), [[12, 12.5], [13, ""], [14, "2026-11-01"]]);
+});
+
+test("reads a card's front and back photos from Photo and Back Photo", () => {
+  const headers = readHeaders(["Card Name", "Set", "Card #", "Rarity", "Variant", "Condition", "Qty", "Market Value (Each)", "Total Value (Auto)", "Last Checked", "TCGplayer (Auto)", "Status", "Photo", "Notes", "Paid (Each)", "Sold For (Each)", "Sold Date", "PSA 9 (Each)", "PSA 10 (Each)", "Back Photo"]);
+  const row = ["Pikachu", "Base Set", "58/102", "Common", "Non-Holo", "NM", 1, 2, "", "", "", "Keep",
+    '=HYPERLINK("https://drive.google.com/file/d/FRONTfrontFRONTfront01/view","Photo")', "", "", "", "", "", "",
+    '=HYPERLINK("https://drive.google.com/file/d/BACKbackBACKbackBACK02/view","Back")'];
+  const item = parseRow("Pokémon", headers, row, 5)!;
+  assert.deepEqual(item.photoIds, ["FRONTfrontFRONTfront01"]);
+  assert.deepEqual(item.backPhotoIds, ["BACKbackBACKbackBACK02"]);
+});
+
+test("orders photos front first, then back, and labels sides only for cards", () => {
+  assert.deepEqual(photoSides(["a1", "a2"], ["b1", "a1"], true), [
+    { fileId: "a1", side: "front" },
+    { fileId: "a2", side: "front" },
+    { fileId: "b1", side: "back" },
+  ]);
+  assert.deepEqual(photoSides(["a1"], [], false), [{ fileId: "a1", side: null }]);
 });

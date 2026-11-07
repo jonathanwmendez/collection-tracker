@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { gradingMath, isStale, marketLink, matchesQuery, realizedGain, sortItems, staleCutoff, subtitle, summarize, unrealizedGain, type Item } from "../src/lib/collection";
+import { gradingMath, isStale, labeledPhotos, marketLink, matchesQuery, realizedGain, sortItems, staleCutoff, subtitle, summarize, unrealizedGain, type Item } from "../src/lib/collection";
 
 const base: Item = {
   id: "1",
@@ -85,4 +85,17 @@ test("CSV export quotes text and blocks formulas", async () => {
   assert.ok(row!.includes(`"Box wear, ""minor"""`));
   assert.ok(row!.includes("'=HYPERLINK(1)"));
   assert.ok(row!.includes("Line / Brand: Playmates Space Jam; Year: 1996"));
+});
+
+test("labels a card's photos Front and Back, and lists a missing back", () => {
+  const photo = (id: string, position: number, side: "front" | "back" | null) => ({ id, position, drive_url: null, side });
+  const both = labeledPhotos({ category: "Pokémon", photos: [photo("f", 0, "front"), photo("b", 1, "back")] });
+  assert.deepEqual(both.photos.map((p) => p.label), ["Front", "Back"]);
+  assert.deepEqual(both.missing, []);
+  const frontOnly = labeledPhotos({ category: "Sports Cards", photos: [photo("f", 0, "front")] });
+  assert.deepEqual(frontOnly.missing, ["Back"]);
+  const none = labeledPhotos({ category: "Pokémon", photos: [] });
+  assert.deepEqual(none.missing, []);
+  const figure = labeledPhotos({ category: "Figures", photos: [photo("x", 0, null)] });
+  assert.equal(figure.photos[0]!.label, undefined);
 });

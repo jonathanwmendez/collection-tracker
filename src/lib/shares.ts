@@ -4,7 +4,7 @@ import { coversCategory, isExpired, looksLikeToken, type Share } from "./share-r
 import { createAdminClient } from "./supabase/admin";
 
 const SHARE_ITEM_COLUMNS =
-  "id, category, name, details, condition, quantity, market_value, value_status, last_checked, status, notes, sheet_row, updated_at, photos(id, position, drive_url)";
+  "id, category, name, details, condition, quantity, market_value, value_status, last_checked, status, notes, sheet_row, updated_at, photos(id, position, drive_url, side)";
 
 /** The share for a link's token, or null when it doesn't exist, was turned off, or has expired. */
 export async function getShare(token: string): Promise<Share | null> {

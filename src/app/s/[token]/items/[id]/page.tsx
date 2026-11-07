@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { categoryByName } from "@/lib/categories";
-import { itemTotal, marketLink } from "@/lib/collection";
+import { itemTotal, labeledPhotos, marketLink } from "@/lib/collection";
 import { money, shortDate } from "@/lib/format";
 import { getShare, getSharedItem } from "@/lib/shares";
 import { PhotoGallery } from "@/components/photo-gallery";
@@ -32,12 +32,14 @@ export default async function SharedItemPage({ params }: { params: Promise<{ tok
 
       {item.photos.length > 0 && (
         <PhotoGallery
-          photos={item.photos.map((p, n) => ({
+          photos={labeledPhotos(item).photos.map((p, n) => ({
             id: p.id,
             preview: `/api/share/${token}/photos/${p.id}`,
             full: `/api/share/${token}/photos/${p.id}?size=full`,
-            alt: `${item.name}, photo ${n + 1}`,
+            alt: `${item.name}, ${p.label ? p.label.toLowerCase() : `photo ${n + 1}`}`,
+            label: p.label,
           }))}
+          missing={labeledPhotos(item).missing}
         />
       )}
 

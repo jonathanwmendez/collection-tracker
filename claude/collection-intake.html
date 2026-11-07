@@ -44,8 +44,26 @@ a{color:var(--link);text-underline-offset:2px}
 .drop p{margin:0;color:var(--muted);font-size:13px;max-width:48ch}
 .drop fieldset{border:0;margin:0;padding:0;width:100%;min-width:0}
 .drop legend{font-size:13px;font-weight:500;color:var(--muted);margin-bottom:8px;padding:0}
-.modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:100%}
-@media (max-width:420px){.modes{grid-template-columns:minmax(0,1fr)}}
+.modes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;width:100%}
+@media (max-width:560px){.modes{grid-template-columns:minmax(0,1fr)}}
+.mode:has(input:disabled){opacity:.6;cursor:default}
+.pick{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.shoot{position:fixed;left:0;right:0;bottom:0;z-index:5;background:var(--surface);border-top:1px solid var(--line);box-shadow:0 -6px 20px rgba(0,0,0,.12);padding:12px max(16px,env(safe-area-inset-left,0px)) max(12px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-right,0px))}
+.shoot[hidden]{display:none}
+.shoot .in{max-width:660px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+.shoot .top{display:flex;gap:12px;align-items:center}
+.shoot .top img{width:44px;height:44px;object-fit:cover;border-radius:6px;border:1px solid var(--line)}
+.shoot .top b{display:block;font-weight:500}
+.shoot .top small{color:var(--muted);font-size:13px}
+.shoot .acts{display:flex;gap:8px}
+.shoot .acts .primary{flex:1}
+body.shooting .wrap{padding-bottom:170px}
+.thumb figcaption{font-size:11px;color:var(--muted);font-weight:500}
+.sum{display:flex;flex-direction:column;gap:2px;min-width:0}
+.sum b{font-size:16px;font-weight:500;overflow-wrap:anywhere}
+.sum small{color:var(--muted);font-size:13px;overflow-wrap:anywhere}
+.estline{font-size:14px;color:var(--clay-ink)}
+.estline span{font-family:var(--mono);font-weight:500}
 .mode{flex-direction:row;align-items:flex-start;gap:10px;text-align:left;border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;color:var(--muted);font-weight:400;font-size:13px}
 .mode input{width:18px;height:18px;min-width:18px;margin:2px 0 0;padding:0;accent-color:var(--primary)}
 .mode b{display:block;color:var(--ink);font-weight:500;font-size:14px}
@@ -118,8 +136,8 @@ textarea{min-height:64px;resize:vertical}
   </header>
 
   <ol class="how" aria-label="How it works">
-    <li><b>Add photos</b>Claude reads each photo and fills in the details.</li>
-    <li><b>Check and approve</b>Fix anything wrong. The value is Claude's estimate.</li>
+    <li><b>Take photos</b>As many as you like. Claude identifies each one while you keep going.</li>
+    <li><b>Check and approve</b>Most items need a quick look. Approve one at a time or all at once.</li>
     <li><b>Saved and priced</b>The item goes in your sheet, then gets a verified price from real sales.</li>
   </ol>
 
@@ -127,19 +145,27 @@ textarea{min-height:64px;resize:vertical}
 
   <section class="drop" id="drop" aria-label="Add photos">
     <fieldset>
-      <legend>What's in each photo?</legend>
+      <legend>What are you adding?</legend>
       <div class="modes">
-        <label class="mode"><input type="radio" name="mode" value="one" checked><span><b>One item</b>Add the back or other angles after Claude identifies it.</span></label>
-        <label class="mode"><input type="radio" name="mode" value="multi"><span><b>Several cards</b>A binder page or cards laid out, up to 9 per photo.</span></label>
+        <label class="mode"><input type="radio" name="mode" value="cards" checked><span><b>Cards, front and back</b>Take the front, then the back. Each pair becomes one card.</span></label>
+        <label class="mode"><input type="radio" name="mode" value="one"><span><b>One item per photo</b>Figures, magazines, and anything else.</span></label>
+        <label class="mode"><input type="radio" name="mode" value="multi"><span><b>Several cards per photo</b>A binder page or cards laid out, up to 9. Fronts only.</span></label>
       </div>
     </fieldset>
-    <button class="primary big" id="pick" type="button">Take or choose photos</button>
-    <p>You can pick several photos at once. On a computer, you can also drop them here.</p>
+    <div class="pick">
+      <button class="primary big" id="shootBtn" type="button">Take photos</button>
+      <button class="big" id="pick" type="button">Choose from library</button>
+    </div>
+    <p id="modeHint"></p>
     <input id="file" class="sr" type="file" accept="image/*" multiple>
+    <input id="cam" class="sr" type="file" accept="image/*" capture="environment">
   </section>
 
   <section id="reviewBox" style="display:none;flex-direction:column;gap:10px">
-    <h2 id="reviewHead">To review</h2>
+    <div class="row" style="justify-content:space-between">
+      <h2 id="reviewHead">To review</h2>
+      <button class="primary" id="approveAll" type="button" hidden>Approve all</button>
+    </div>
     <div class="queue" id="queue" aria-live="polite"></div>
   </section>
 
@@ -153,6 +179,17 @@ textarea{min-height:64px;resize:vertical}
   </section>
 </div>
 
+<div class="shoot" id="shoot" hidden role="region" aria-label="Taking photos">
+  <div class="in">
+    <div class="top"><img id="shootThumb" alt="" hidden><div><b id="shootTitle"></b><small id="shootSub"></small></div></div>
+    <div class="acts">
+      <button class="primary big" id="shootNext" type="button">Take photo</button>
+      <button id="shootSkip" type="button" hidden>No back</button>
+      <button id="shootDone" type="button">Done</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (() => {
 const SHEET = "{{SHEET_ID}}";
@@ -160,15 +197,17 @@ const TRIGGER = "{{PRICE_CHECK_TASK_ID}}";
 const CARD_COND = ["NM","LP","MP","HP","DMG"];
 const PAPER_COND = ["Mint","Near Mint","Very Good","Good","Fair","Poor"];
 const TAIL = ["@mv","@auto","@lc","@auto","@status","@photo","@notes","@paid"];
+// Card tabs go on: Sold For, Sold Date, PSA 9, PSA 10 (never written here), then Back Photo.
+const CARD_TAIL = [...TAIL, "@sold","@solddate","@psa9","@psa10","@back"];
 const TABS = {
   "Sports Cards": {folder:"{{FOLDER_SPORTS_CARDS}}", cond:["Raw","Graded"],
-    cols:["Player","Year","Brand / Set","Card #","Parallel / Variant","@cond","Grade","@qty",...TAIL]},
+    cols:["Player","Year","Brand / Set","Card #","Parallel / Variant","@cond","Grade","@qty",...CARD_TAIL]},
   "Magic: The Gathering": {folder:"{{FOLDER_MAGIC}}", cond:CARD_COND,
-    cols:["Card Name","Set","Collector #","Finish","@cond","@qty",...TAIL], opts:{"Finish":["Non-foil","Foil","Etched"]}},
+    cols:["Card Name","Set","Collector #","Finish","@cond","@qty",...CARD_TAIL], opts:{"Finish":["Non-foil","Foil","Etched"]}},
   "Yu-Gi-Oh!": {folder:"{{FOLDER_YUGIOH}}", cond:CARD_COND,
-    cols:["Card Name","Set","Set Code","Rarity","Edition","@cond","@qty",...TAIL], opts:{"Edition":["1st Edition","Unlimited","Limited Edition"]}},
+    cols:["Card Name","Set","Set Code","Rarity","Edition","@cond","@qty",...CARD_TAIL], opts:{"Edition":["1st Edition","Unlimited","Limited Edition"]}},
   "Pokémon": {folder:"{{FOLDER_POKEMON}}", cond:CARD_COND,
-    cols:["Card Name","Set","Card #","Rarity","Variant","@cond","@qty",...TAIL], opts:{"Variant":["Non-Holo","Holo","Reverse Holo","1st Edition","Shadowless"]}},
+    cols:["Card Name","Set","Card #","Rarity","Variant","@cond","@qty",...CARD_TAIL], opts:{"Variant":["Non-Holo","Holo","Reverse Holo","1st Edition","Shadowless"]}},
   "Figures": {folder:"{{FOLDER_FIGURES}}", cond:["In Box","Loose","Opened"],
     cols:["Name","Line / Brand","Year","@cond","@qty",...TAIL]},
   "Magazines": {folder:"{{FOLDER_MAGAZINES}}", cond:PAPER_COND,
@@ -183,6 +222,7 @@ const TABS = {
 const STATUSES = ["Keep","Sell","Listed","Sold"];
 const L = i => String.fromCharCode(65 + i);
 const fieldsOf = tab => TABS[tab].cols.filter(c => !c.startsWith("@"));
+const isCardTab = tab => TABS[tab]?.cols.includes("@back");
 const colOf = (tab, key) => L(TABS[tab].cols.indexOf(key));
 
 let sample = null, mcp = null, fileArgs = false, imgMax = 4;
@@ -274,6 +314,19 @@ function toBase64(blob){
 }
 
 // ---------- adding photos ----------
+const MODE_KEY = "intake-mode-v1";
+const HINTS = {
+  cards: "Take photos: shoot the front, then the back, for each card. From the library: pick them in order, front, back, front, back.",
+  one: "Each photo becomes one item. You can add more angles to an item after Claude identifies it.",
+  multi: "Each photo becomes several cards. Backs aren't saved in this mode.",
+};
+const radios = [...document.querySelectorAll('input[name="mode"]')];
+let mode = "cards";
+try { const m = localStorage.getItem(MODE_KEY); if (HINTS[m]) mode = m; } catch {}
+radios.forEach(r => { r.checked = r.value === mode; r.onchange = () => { if (r.checked){ mode = r.value; try { localStorage.setItem(MODE_KEY, mode); } catch {} showHint(); } }; });
+function showHint(){ document.getElementById("modeHint").textContent = HINTS[mode]; }
+showHint();
+
 const fileInput = document.getElementById("file");
 document.getElementById("pick").onclick = () => fileInput.click();
 fileInput.onchange = () => { addFiles(fileInput.files); fileInput.value = ""; };
@@ -282,13 +335,57 @@ drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add(
 drop.addEventListener("dragleave", () => drop.classList.remove("over"));
 drop.addEventListener("drop", e => { e.preventDefault(); drop.classList.remove("over"); addFiles(e.dataTransfer.files); });
 
+function newItem(photos, opts = {}){
+  const it = {id: ++seq, photos, rot: photos.map(() => 0), state:"queued", draft:null, error:"", steps:[], multi: !!opts.multi, sides: !!opts.sides};
+  items.push(it); render(it); it.multi ? identifyMany(it) : identify(it);
+  return it;
+}
+
+// Library picks keep the order they were taken in, so fronts and backs pair up.
 function addFiles(list){
-  const multi = document.querySelector('input[name="mode"]:checked')?.value === "multi";
-  for (const f of list){
-    if (!f.type.startsWith("image/")) continue;
-    const it = {id: ++seq, photos:[f], rot:[0], state:"queued", draft:null, error:"", steps:[], multi};
-    items.push(it); render(it); multi ? identifyMany(it) : identify(it);
+  const files = [...list].filter(f => f.type.startsWith("image/")).sort((a, b) => a.lastModified - b.lastModified);
+  if (!files.length) return;
+  if (mode === "cards") for (let i = 0; i < files.length; i += 2) newItem(files.slice(i, i + 2), {sides:true});
+  else for (const f of files) newItem([f], {multi: mode === "multi"});
+}
+
+// Taking photos: one tap per shot, with a bar that says what to shoot next. Items are identified as you go.
+const cam = document.getElementById("cam");
+let shoot = null; // {mode, pending: front photo waiting for its back, made: items so far}
+document.getElementById("shootBtn").onclick = () => { shoot = {mode, pending:null, made:0}; updateShoot(); cam.click(); };
+document.getElementById("shootNext").onclick = () => cam.click();
+document.getElementById("shootSkip").onclick = () => { if (shoot?.pending){ newItem([shoot.pending], {sides:true}); shoot.pending = null; shoot.made++; updateShoot(); } };
+document.getElementById("shootDone").onclick = () => { if (shoot?.pending){ newItem([shoot.pending], {sides:true}); } shoot = null; updateShoot(); };
+cam.onchange = () => {
+  const f = cam.files[0]; cam.value = "";
+  if (!f || !shoot) return;
+  if (shoot.mode === "cards"){
+    if (!shoot.pending) shoot.pending = f;
+    else { newItem([shoot.pending, f], {sides:true}); shoot.pending = null; shoot.made++; }
+  } else { newItem([f], {multi: shoot.mode === "multi"}); shoot.made++; }
+  updateShoot();
+};
+function updateShoot(){
+  const bar = document.getElementById("shoot"), on = !!shoot;
+  bar.hidden = !on; document.body.classList.toggle("shooting", on);
+  radios.forEach(r => { r.disabled = on; });
+  if (!on) return;
+  const n = shoot.made, plural = (k, w) => `${k} ${w}${k === 1 ? "" : "s"}`;
+  const thumb = document.getElementById("shootThumb"), skip = document.getElementById("shootSkip"), next = document.getElementById("shootNext");
+  let title, sub;
+  if (shoot.mode === "cards"){
+    title = shoot.pending ? `Card ${n + 1}: now the back` : `Card ${n + 1}: the front`;
+    next.textContent = shoot.pending ? "Take the back" : "Take the front";
+    sub = n ? `${plural(n, "card")} so far. Claude is identifying them.` : "Flip each card after its front photo.";
+  } else {
+    title = n ? `${plural(n, "photo")} so far` : "Take your first photo";
+    next.textContent = n ? "Take next photo" : "Take photo";
+    sub = n ? "Claude identifies each one while you keep going." : (shoot.mode === "multi" ? "Lay out up to 9 cards per photo." : "One item per photo.");
   }
+  document.getElementById("shootTitle").textContent = title;
+  document.getElementById("shootSub").textContent = sub;
+  skip.hidden = !shoot.pending;
+  if (shoot.pending){ thumb.src = (shoot.pending._url ||= URL.createObjectURL(shoot.pending)); thumb.hidden = false; } else thumb.hidden = true;
 }
 
 // ---------- identification ----------
@@ -390,8 +487,10 @@ async function identify(it){
   await slot();
   try {
     const imgs = await Promise.all(it.photos.slice(0, imgMax).map((f, i) => it.rot[i] ? toJpeg(f, 2000, 0.9, it.rot[i]) : f));
-    const out = await sample.json(prompt(), {images: imgs, modelTier: "default"});
+    const sides = it.sides && imgs.length > 1 ? `\n\nThis is a card: photo 1 is the FRONT and photo 2 is the BACK. Use both (the back often shows the set, number, year, and copyright line).` : "";
+    const out = await sample.json(prompt() + sides, {images: imgs, modelTier: "default"});
     it.draft = draftFrom(out);
+    it.open = needsLook(it);
     it.state = "draft";
   } catch (e){
     it.state = "idfail"; it.error = sampleWhy(e);
@@ -405,17 +504,35 @@ function updateReviewHead(){
   const box = document.getElementById("reviewBox"), n = items.length;
   box.style.display = n ? "flex" : "none";
   const waiting = items.filter(x => x.state === "draft" || x.state === "dup").length;
-  document.getElementById("reviewHead").textContent = waiting ? `To review (${waiting})` : "In progress";
+  const working = items.filter(x => x.state === "queued" || x.state === "identifying").length;
+  document.getElementById("reviewHead").textContent = waiting ? `To review (${waiting})${working ? `, ${working} identifying` : ""}` : (working ? `Identifying ${working}` : "In progress");
+  const ready = items.filter(isReady).length, all = document.getElementById("approveAll");
+  all.hidden = ready < 2 || bulkRunning; all.textContent = `Approve ${ready} ready`;
 }
+// Ready: identified with no flags. Items marked low confidence or "Check this" wait for a manual look.
+const needsLook = it => it.draft.confidence === "low" || !!it.draft.uncertain || !it.draft.fields[fieldsOf(it.draft.tab)[0]];
+const isReady = it => it.state === "draft" && !needsLook(it);
+let bulkRunning = false;
+document.getElementById("approveAll").onclick = async () => {
+  bulkRunning = true; updateReviewHead();
+  for (const it of items.filter(isReady)) if (items.includes(it) && isReady(it)) await approve(it);
+  bulkRunning = false; updateReviewHead();
+};
 function render(it){
   let card = document.getElementById("item-" + it.id);
   const fresh = h("article", {class:"card", id:"item-" + it.id, "aria-label":"Item " + it.id}, ...cardBody(it));
   if (card) card.replaceWith(fresh); else queue.prepend(fresh);
   updateReviewHead();
 }
+function sideOf(it, i){
+  const card = it.draft ? isCardTab(it.draft.tab) : it.sides;
+  if (!card || it.group) return "";
+  return i === 0 ? "Front" : i === 1 ? "Back" : `Photo ${i + 1}`;
+}
 function thumbs(it, editable){
   return h("div", {class:"thumbs"}, it.photos.map((f, i) => h("figure", {class:"thumb"},
-    h("img", {src: (f._url ||= URL.createObjectURL(f)), alt: `Photo ${i + 1} of the item`, style: `transform:rotate(${it.rot[i] || 0}deg)`}),
+    h("img", {src: (f._url ||= URL.createObjectURL(f)), alt: sideOf(it, i) ? `${sideOf(it, i)} of the card` : `Photo ${i + 1} of the item`, style: `transform:rotate(${it.rot[i] || 0}deg)`}),
+    sideOf(it, i) ? h("figcaption", {}, sideOf(it, i)) : null,
     editable ? h("button", {type:"button", class:"rot", "aria-label": `Rotate photo ${i + 1} clockwise`,
       onclick: () => { it.rot[i] = ((it.rot[i] || 0) + 90) % 360; render(it); }}, "Rotate") : null)));
 }
@@ -443,7 +560,30 @@ function cardBody(it){
         h("button", {type:"button", class:"primary", onclick: () => approve(it)}, "Try again"),
         h("button", {type:"button", class:"ghost", onclick: () => { it.state = "draft"; it.error = ""; render(it); }}, "Back to edit")) : null,
       it.state === "saved" ? h("div", {class:"row"}, h("span", {class:"est"}, "Done. It's listed under Recently added."), h("button", {type:"button", class:"ghost", onclick: () => remove(it)}, "Dismiss")) : null];
-  return draftForm(it);
+  return it.open ? draftForm(it) : summary(it);
+}
+
+function addPhotoLabel(it){ return isCardTab(it.draft.tab) && it.photos.length === 1 ? "Add the back" : "Add another angle"; }
+
+function summary(it){
+  const d = it.draft, f = fieldsOf(d.tab);
+  const sub = [d.tab, ...f.slice(1).map(k => d.fields[k]).filter(Boolean), d.cond, Number(d.qty) > 1 ? `Qty ${d.qty}` : ""].filter(Boolean).join(" · ");
+  const noBack = isCardTab(d.tab) && !it.group && it.photos.length < 2;
+  return [
+    thumbs(it, false),
+    it.error ? h("div", {class:"err"}, it.error) : null,
+    h("div", {class:"sum"}, h("b", {}, d.fields[f[0]] || "Unnamed item"), h("small", {}, sub)),
+    h("div", {class:"row"},
+      h("span", {class:"pill " + d.confidence}, `${d.confidence[0].toUpperCase() + d.confidence.slice(1)} confidence`),
+      it.group ? h("span", {class:"pill"}, it.label ? `From a ${it.group.count}-item photo, ${it.label}` : `From a ${it.group.count}-item photo`) : null),
+    h("div", {class:"estline"}, "Claude's estimate: ", h("span", {}, d.estimate !== "" ? `$${Number(d.estimate).toFixed(2)} each` : "none"), " (checked against real sales after you approve)"),
+    noBack ? h("div", {class:"est"}, "No photo of the back. Add it if you have one.") : null,
+    h("div", {class:"row"},
+      h("button", {type:"button", class:"primary", onclick: () => approve(it)}, "Approve and save"),
+      h("button", {type:"button", onclick: () => { it.open = true; render(it); }}, "Edit details"),
+      noBack ? h("button", {type:"button", onclick: () => addMore(it)}, "Add the back") : null,
+      h("button", {type:"button", class:"ghost", onclick: () => remove(it)}, "Discard")),
+  ];
 }
 
 function draftForm(it){
@@ -483,7 +623,8 @@ function draftForm(it){
     ),
     h("div", {class:"row"},
       h("button", {type:"button", class:"primary", onclick: () => approve(it)}, "Approve and save"),
-      it.group ? null : h("button", {type:"button", onclick: () => addMore(it)}, "Add a photo (back or angle)"),
+      it.group ? null : h("button", {type:"button", onclick: () => addMore(it)}, addPhotoLabel(it)),
+      h("button", {type:"button", class:"ghost", onclick: () => { it.open = false; render(it); }}, "Done editing"),
       it.group ? null : h("button", {type:"button", class:"ghost", onclick: () => identify(it)}, "Identify again"),
       h("button", {type:"button", class:"ghost", onclick: () => remove(it)}, "Discard")),
   ];
@@ -580,7 +721,7 @@ async function approve(it){
 
   it.state = "saving"; it.error = "";
   it.steps = [
-    {key:"photo", text: done.photoUrl ? "Photo saved to Drive" : `Saving ${it.photos.length > 1 ? "photos" : "photo"} to the ${d.tab} folder`, state: done.photoUrl ? "done" : "doing"},
+    {key:"photo", text: done.photoUrl ? "Photo saved to Drive" : `Saving ${isCardTab(d.tab) && it.photos.length > 1 && !it.group ? "front and back" : it.photos.length > 1 ? "photos" : "photo"} to the ${d.tab} folder`, state: done.photoUrl ? "done" : "doing"},
     {key:"row", text: done.row ? `Added to ${d.tab}, row ${done.row}` : `Adding the row to ${d.tab}`, state: done.row ? "done" : ""},
     {key:"price", text:"Starting the price check", state:""},
   ];
@@ -601,7 +742,8 @@ async function approve(it){
       const base = it.group ? `${clean(d.tab)} - ${it.group.count}-item photo - ${stamp}` : [clean(d.tab), clean(name), clean(yr)].filter(Boolean).join(" - ");
       const urls = [];
       for (let i = 0; i < it.photos.length; i++){
-        const title = base + (i ? ` (${i + 1})` : "") + ".jpg";
+        const side = sideOf(it, i);
+        const title = base + (side ? ` - ${side.toLowerCase()}` : (i ? ` (${i + 1})` : "")) + ".jpg";
         let content;
         if (fileArgs){
           const blob = await toJpeg(it.photos[i], 2400, 0.88, it.rot[i]);
@@ -617,8 +759,9 @@ async function approve(it){
         urls.push(p.viewUrl || (p.id ? `https://drive.google.com/file/d/${p.id}/view` : ""));
       }
       done.photoUrl = urls[0] || "none";
+      done.backUrl = isCardTab(d.tab) && !it.group ? (urls[1] || "") : "";
       resolveShared?.res(done.photoUrl);
-      step("photo", "done", `Saved ${it.photos.length > 1 ? it.photos.length + " photos" : "photo"} as “${base}.jpg”`);
+      step("photo", "done", done.backUrl ? "Saved the front and back to Drive" : `Saved ${it.photos.length > 1 ? it.photos.length + " photos" : "photo"} as “${base}.jpg”`);
     } catch (e){
       if (it.group) uploads.delete(it.group.id);
       resolveShared?.rej(e);
@@ -646,6 +789,8 @@ async function approve(it){
           case "@status": return d.status;
           case "@photo": return done.photoUrl && done.photoUrl !== "none" ? `=HYPERLINK("${done.photoUrl}","Photo")` : "";
           case "@notes": return tag + d.notes.trim();
+          case "@sold": case "@solddate": case "@psa9": case "@psa10": return null;
+          case "@back": return done.backUrl ? `=HYPERLINK("${done.backUrl}","Back")` : "";
           case "@paid": return Number(d.paid) > 0 ? Math.round(Number(d.paid) * 100) / 100 : "";
           default: return safeCell((d.fields[c] || "").trim());
         }

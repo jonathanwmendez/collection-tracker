@@ -2,7 +2,7 @@
 
 import { categoryByName } from "./categories";
 
-export type Photo = { id: string; position: number; drive_url: string | null };
+export type Photo = { id: string; position: number; drive_url: string | null; side?: "front" | "back" | null };
 
 export type Item = {
   id: string;
@@ -26,6 +26,23 @@ export type Item = {
   psa9: number | null;
   psa10: number | null;
 };
+
+/**
+ * Photos in display order with a label for each. Cards label their sides (Front, Back) and list a
+ * side with no photo yet as missing. Other items have no labels.
+ */
+export function labeledPhotos(item: Pick<Item, "category" | "photos">): { photos: Array<Photo & { label?: string }>; missing: string[] } {
+  if (!categoryByName(item.category)?.backPhoto) return { photos: item.photos, missing: [] };
+  const fronts = item.photos.filter((p) => p.side !== "back");
+  const backs = item.photos.filter((p) => p.side === "back");
+  const name = (side: string, n: number, of: number) => (of > 1 ? `${side} ${n + 1}` : side);
+  const photos = [
+    ...fronts.map((p, n) => ({ ...p, label: name("Front", n, fronts.length) })),
+    ...backs.map((p, n) => ({ ...p, label: name("Back", n, backs.length) })),
+  ];
+  const missing = [...(fronts.length ? [] : ["Front"]), ...(backs.length ? [] : ["Back"])];
+  return { photos, missing: photos.length ? missing : [] };
+}
 
 export const SORTS = {
   value: "Highest value",

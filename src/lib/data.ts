@@ -32,7 +32,7 @@ export async function getSettings(supabase: SupabaseClient): Promise<Settings> {
 }
 
 const ITEM_COLUMNS =
-  "id, category, name, details, condition, quantity, market_value, value_status, last_checked, status, notes, sheet_row, updated_at, paid, sold_price, sold_on, psa9, psa10, photos(id, position, drive_url)";
+  "id, category, name, details, condition, quantity, market_value, value_status, last_checked, status, notes, sheet_row, updated_at, paid, sold_price, sold_on, psa9, psa10, photos(id, position, drive_url, side)";
 
 export async function getItems(supabase: SupabaseClient, category?: string): Promise<Item[]> {
   let q = supabase.from("items").select(ITEM_COLUMNS).order("sheet_row", { ascending: true });

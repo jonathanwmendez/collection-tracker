@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export type GalleryPhoto = { id: string; preview: string; full: string; alt: string; driveUrl?: string | null };
+export type GalleryPhoto = { id: string; preview: string; full: string; alt: string; driveUrl?: string | null; label?: string };
 
 /**
  * A row of photos. Tapping one opens it full screen: swipe or use the arrow keys to move between
- * photos, pinch to zoom, and tap Close or press Escape to leave.
+ * photos, pinch to zoom, and tap Close or press Escape to leave. Cards show each photo's side
+ * (Front, Back) and an empty slot for a side that has no photo yet.
  */
-export function PhotoGallery({ photos }: { photos: GalleryPhoto[] }) {
+export function PhotoGallery({ photos, missing = [] }: { photos: GalleryPhoto[]; missing?: string[] }) {
+  const labeled = photos.some((p) => p.label) || missing.length > 0;
   const dialog = useRef<HTMLDialogElement>(null);
   const [index, setIndex] = useState<number | null>(null);
   const [loaded, setLoaded] = useState<Record<string, boolean>>({});
@@ -57,16 +59,30 @@ export function PhotoGallery({ photos }: { photos: GalleryPhoto[] }) {
     <>
       <section aria-label="Photos" className="flex gap-3 overflow-x-auto snap-x pb-1 -mx-1 px-1">
         {photos.map((p, n) => (
-          <button
-            key={p.id}
-            type="button"
-            onClick={() => open(n)}
-            className="snap-start shrink-0 rounded-2xl cursor-zoom-in"
-            aria-label={`View photo ${n + 1} full screen`}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={p.preview} alt={p.alt} className="h-72 w-auto max-w-[85vw] rounded-2xl border border-line bg-navy-soft object-contain" />
-          </button>
+          <figure key={p.id} className="snap-start shrink-0 m-0 flex flex-col items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => open(n)}
+              className="rounded-2xl cursor-zoom-in"
+              aria-label={`View ${p.label ? p.label.toLowerCase() : `photo ${n + 1}`} full screen`}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={p.preview}
+                alt={p.alt}
+                className={`${labeled ? "h-60 max-w-[44vw] sm:max-w-[85vw]" : "h-72 max-w-[85vw]"} w-auto rounded-2xl border border-line bg-navy-soft object-contain`}
+              />
+            </button>
+            {p.label && <figcaption className="text-xs font-medium text-muted">{p.label}</figcaption>}
+          </figure>
+        ))}
+        {missing.map((label) => (
+          <figure key={label} className="snap-start shrink-0 m-0 flex flex-col items-center gap-1.5">
+            <div className="h-60 w-[min(171px,44vw)] rounded-2xl border border-dashed border-line flex items-center justify-center p-3 text-center text-sm text-muted">
+              No photo of the {label.toLowerCase()} yet
+            </div>
+            <figcaption className="text-xs font-medium text-muted">{label}</figcaption>
+          </figure>
         ))}
       </section>
 
@@ -103,7 +119,7 @@ export function PhotoGallery({ photos }: { photos: GalleryPhoto[] }) {
 
             <div className="absolute top-0 inset-x-0 flex items-center justify-between gap-3 p-3 pt-[max(12px,env(safe-area-inset-top))] bg-gradient-to-b from-black/60 to-transparent">
               <span className="text-sm tabular-nums" aria-live="polite">
-                {photos.length > 1 ? `${index! + 1} / ${photos.length}` : ""}
+                {[current.label, photos.length > 1 ? `${index! + 1} / ${photos.length}` : ""].filter(Boolean).join(" · ")}
               </span>
               <div className="flex items-center gap-2">
                 {current.driveUrl && (

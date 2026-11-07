@@ -9,6 +9,8 @@ export type Category = {
   conditions: string[];
   /** Suggested values for fields that have common options. */
   suggestions?: Record<string, string[]>;
+  /** Cards: the tab has a Back Photo column, and photos are shown as Front and Back. */
+  backPhoto?: boolean;
 };
 
 const CARD_CONDITIONS = ["NM", "LP", "MP", "HP", "DMG"];
@@ -20,6 +22,7 @@ export const CATEGORIES: Category[] = [
     slug: "sports-cards",
     fields: ["Player", "Year", "Brand / Set", "Card #", "Parallel / Variant", "Grade"],
     conditions: ["Raw", "Graded"],
+    backPhoto: true,
   },
   {
     name: "Magic: The Gathering",
@@ -27,6 +30,7 @@ export const CATEGORIES: Category[] = [
     fields: ["Card Name", "Set", "Collector #", "Finish"],
     conditions: CARD_CONDITIONS,
     suggestions: { Finish: ["Non-foil", "Foil", "Etched"] },
+    backPhoto: true,
   },
   {
     name: "Yu-Gi-Oh!",
@@ -34,6 +38,7 @@ export const CATEGORIES: Category[] = [
     fields: ["Card Name", "Set", "Set Code", "Rarity", "Edition"],
     conditions: CARD_CONDITIONS,
     suggestions: { Edition: ["1st Edition", "Unlimited", "Limited Edition"] },
+    backPhoto: true,
   },
   {
     name: "Pokémon",
@@ -41,6 +46,7 @@ export const CATEGORIES: Category[] = [
     fields: ["Card Name", "Set", "Card #", "Rarity", "Variant"],
     conditions: CARD_CONDITIONS,
     suggestions: { Variant: ["Non-Holo", "Holo", "Reverse Holo", "1st Edition", "Shadowless"] },
+    backPhoto: true,
   },
   {
     name: "Figures",

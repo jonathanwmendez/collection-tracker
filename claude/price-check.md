@@ -23,7 +23,7 @@ TABS (row 1 is the header; data starts at row 2). For each tab: the identifying 
 - 'Newspapers': A Newspaper, B Date, C Headline, D Condition, E Qty. Market Value F, Last Checked H, Status J, Notes L.
 - 'Ornaments': A Name, B Brand / Series, C Year, D Condition, E Qty. Market Value F, Last Checked H, Status J, Notes L.
 - 'Other': A Item, B Type, C Year, D Condition, E Qty. Market Value F, Last Checked H, Status J, Notes L.
-The columns after Notes (Paid, Sold For, Sold Date) belong to the owner: never write them.
+The columns after Notes (Paid, Sold For, Sold Date, and Back Photo on card tabs) belong to the owner: never write them.
 
 NEW TABS
 If the spreadsheet has a category tab that isn't listed above (any tab except 'Summary' and 'Price Log'), read its row 1 to find the "Market Value (Each)", "Last Checked", and "Notes" columns and price it the same way. Before pricing a new kind of item, search for the trusted sold-price sources for it (completed-sales databases, auction archives, the hobby's standard price guide) and use the best ones. List those sources in your final summary under "Suggested sources for <tab>" so they can be added to this list.
@@ -57,7 +57,7 @@ WHAT TO WRITE
 - Last Checked: today's date as YYYY-MM-DD.
 - Notes: keep any text the owner wrote. Remove a leading "[Estimate ...]" or "[No estimate yet]" tag if present. Remove any earlier "Verified $...", "Set by hand to $...", or "Price check ...: no reliable sold data..." sentence, so Notes holds the owner's text plus only the latest result. Then append: "Verified $X on YYYY-MM-DD: median of N sold ([sources])." or, for a price guide, "Verified $X on YYYY-MM-DD: [guide] [price type] ([source])." If you could not find reliable sales, keep the existing value (write null for Market Value), still set Last Checked so the row isn't retried every run, and append: "Price check YYYY-MM-DD: no reliable sold data, value is an estimate."
 - Always start the appended note with "Verified $" or include "no reliable sold data" exactly as above; the Collection Tracker app reads those phrases.
-- NEVER write to the Total Value or the eBay/TCGplayer link columns, the Status column, the Photo column, or the Paid, Sold For, and Sold Date columns (always null). They hold formulas or the owner's data.
+- NEVER write to the Total Value or the eBay/TCGplayer link columns, the Status column, the Photo and Back Photo columns, or the Paid, Sold For, and Sold Date columns (always null). They hold formulas or the owner's data.
 
 PRICE ALERTS (nightly run only, after pricing)
 - Read the "Alert On Change (%)" setting on the 'Summary' tab. If it's blank or 0, skip alerts.

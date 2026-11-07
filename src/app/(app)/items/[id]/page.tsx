@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getItem, getSettings } from "@/lib/data";
 import { categoryByName } from "@/lib/categories";
-import { gradingMath, isStale, itemTotal, marketLink, realizedGain, sheetLink, unrealizedGain } from "@/lib/collection";
+import { gradingMath, isStale, itemTotal, labeledPhotos, marketLink, realizedGain, sheetLink, unrealizedGain } from "@/lib/collection";
 import { money, shortDate, signedMoney } from "@/lib/format";
 import { canCheckPrice } from "@/lib/prices";
 import { ItemActions } from "@/components/item-actions";
@@ -56,13 +56,15 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
 
       {item.photos.length > 0 && (
         <PhotoGallery
-          photos={item.photos.map((p, n) => ({
+          photos={labeledPhotos(item).photos.map((p, n) => ({
             id: p.id,
             preview: `/api/photos/${p.id}/preview`,
             full: `/api/photos/${p.id}/preview?size=full`,
-            alt: `${item.name}, photo ${n + 1}`,
+            alt: `${item.name}, ${p.label ? p.label.toLowerCase() : `photo ${n + 1}`}`,
             driveUrl: p.drive_url,
+            label: p.label,
           }))}
+          missing={labeledPhotos(item).missing}
         />
       )}
 
