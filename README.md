@@ -44,6 +44,7 @@ About 30 minutes. Do the steps in order: each one uses an address from the one b
 | Google Sheets | Setup, Collection Intake, price check | Reading and writing the sheet |
 | Google Drive | Setup, Collection Intake | Photo folders and uploads |
 | Gmail | Price check | Price alert emails. Optional: without it, alerts go in the Price Log tab instead |
+| Supabase | Setup | Optional. Runs the database migrations for you (create the Supabase project in step 2.1 first) |
 
 Collection Intake also starts the price check right after you approve items, using Claude's own scheduled task tools. Nothing to connect for that.
 
@@ -54,7 +55,7 @@ Paste [`claude/SETUP.md`](claude/SETUP.md) into a new Claude conversation, after
 ### 2. Supabase
 
 1. Create a project at [supabase.com](https://supabase.com). Under **Security**: keep **Enable Data API** on, turn **Automatically expose new tables** off, turn **Enable automatic RLS** on.
-2. **SQL Editor:** run the files in [`supabase/migrations/`](supabase/migrations) in order, `0001` through `0006`.
+2. **SQL Editor:** run the files in [`supabase/migrations/`](supabase/migrations) in order, `0001` through `0006`. Skip this if Claude already ran them in step 1 with the Supabase connector.
 3. **Settings > API Keys:** copy the project URL, a publishable key, and a secret key.
 
 ### 3. Google Cloud

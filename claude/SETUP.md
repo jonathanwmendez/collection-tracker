@@ -1,8 +1,8 @@
-Paste everything below the line into a new Claude conversation that has the Google Drive, Google Sheets, and Gmail connectors turned on (Gmail is optional, for price alerts). Claude builds the sheet, the photo folders, the nightly price check, and the Collection Intake page, then gives you the two links the web app needs.
+Paste everything below the line into a new Claude conversation that has the Google Drive, Google Sheets, and Gmail connectors turned on (Gmail is optional, for price alerts). If you already created your Supabase project (README step 2.1), also turn on the Supabase connector and Claude will set up the database too. Claude builds the sheet, the photo folders, the nightly price check, and the Collection Intake page, then gives you the two links the web app needs.
 
 ---
 
-Set up my Collection Tracker. Use the Google Sheets, Google Drive, and Gmail connectors, your scheduled task tools, and your artifact tools. The files mentioned below are in https://github.com/jonathanwmendez/collection-tracker under `claude/`. My time zone is: <your time zone, for example America/New_York>.
+Set up my Collection Tracker. Use the Google Sheets, Google Drive, Gmail, and Supabase connectors (whichever are on), your scheduled task tools, and your artifact tools. The files mentioned below are in https://github.com/jonathanwmendez/collection-tracker (paths are from the repository root). My time zone is: <your time zone, for example America/New_York>.
 
 1. **Sheet.** Create a Google Sheet named "Collection Tracker", in Roboto, with these tabs. Row 1 holds the headers, frozen and bold. Header colors: navy (#1F3864, white text) for columns I fill in, Claude orange (#D97757, white text) for Market Value (Each), Last Checked, PSA 9 (Each), and PSA 10 (Each), gray (#6B7280, white text) for columns ending in "(Auto)". Format money columns as $#,##0.00 and date columns as mmm d, yyyy.
    - Sports Cards: Player, Year, Brand / Set, Card #, Parallel / Variant, Condition, Grade, Qty, Market Value (Each), Total Value (Auto), Last Checked, eBay Sold (Auto), Status, Photo, Notes, Paid (Each), Sold For (Each), Sold Date, PSA 9 (Each), PSA 10 (Each)
@@ -29,4 +29,6 @@ Set up my Collection Tracker. Use the Google Sheets, Google Drive, and Gmail con
 
 4. **Collection Intake.** Publish `claude/collection-intake.html` as an artifact titled "Collection Intake", with every {{...}} placeholder filled in: the sheet ID, the photos folder ID, each category folder ID, and the price check task ID. Give it these capabilities: `sample` with images, and `mcp` with Google Drive `create_file`, Google Sheets `get_values` and `update_values`, and your scheduled task tool `fire_trigger`. Pin it.
 
-5. **Finish** by giving me the sheet's link and the Collection Intake link, to paste into the web app's Settings page.
+5. **Database (only if the Supabase connector is on).** List my Supabase projects and use the one named "collection-tracker" (ask me if there isn't exactly one match; never create a project). Check which migrations are already applied, then apply each remaining file in `supabase/migrations/` in number order, one migration per file, named after the file. Then run the security advisor and tell me about any warnings. If the connector is off, skip this step and remind me to run the migrations myself (README step 2.2).
+
+6. **Finish** by giving me the sheet's link and the Collection Intake link, to paste into the web app's Settings page, and say whether the database is set up.
