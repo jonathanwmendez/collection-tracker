@@ -2,7 +2,7 @@
 
 A phone-first web app for cataloging and valuing collectibles: sports cards, Magic: The Gathering, Yu-Gi-Oh!, Pokémon, figures, magazines, newspapers, ornaments, and more.
 
-**[Try the demo](https://collection-tracker-chi.vercel.app/demo)** (sample data, no sign-in).
+**[Try the demo](https://jonathanwmendez-collection-tracker.vercel.app/demo)** (sample data, no sign-in).
 
 <p>
   <img src="docs/collection.png" alt="Collection overview with categories and totals" width="260">

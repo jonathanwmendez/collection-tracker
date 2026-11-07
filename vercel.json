@@ -7,5 +7,18 @@
       "path": "/api/cron/sync",
       "requestMethod": "GET"
     }
-  }
+  },
+  "redirects": [
+    {
+      "source": "/:path((?!api/cron/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "collection-tracker-chi.vercel.app"
+        }
+      ],
+      "destination": "https://jonathanwmendez-collection-tracker.vercel.app/:path",
+      "permanent": true
+    }
+  ]
 }
