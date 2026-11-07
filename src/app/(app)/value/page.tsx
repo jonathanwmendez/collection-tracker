@@ -132,7 +132,7 @@ export default async function ValuePage() {
           </li>
         </ul>
         <p className="text-sm text-muted">
-          Claude&apos;s price check runs nightly at 3:30 AM on your Claude plan. It prices every item waiting for a check, then rechecks the oldest prices until none are due or it reaches 8:00 AM. Each run is logged in the sheet's Price Log tab.
+          Claude&apos;s price check runs nightly at 3:30 AM on your Claude plan. It prices every item waiting for a check, then rechecks the oldest prices until none are due or it reaches 8:00 AM. Each run is logged in the sheet&apos;s Price Log tab.
         </p>
         {staleCount > 0 && <RepriceStale count={staleCount} />}
       </section>
