@@ -45,6 +45,7 @@ About 30 minutes. Do the steps in order: each one uses an address from the one b
 | Google Drive | Setup, Collection Intake | Photo folders and uploads |
 | Gmail | Price check | Price alert emails. Optional: without it, alerts go in the Price Log tab instead |
 | Supabase | Setup | Optional. Runs the database migrations for you (create the Supabase project in step 2.1 first) |
+| Vercel | Setup | Optional. Creates the Vercel project and adds the variables that aren't secret |
 
 Collection Intake also starts the price check right after you approve items, using Claude's own scheduled task tools. Nothing to connect for that.
 
@@ -73,7 +74,7 @@ Paste [`claude/SETUP.md`](claude/SETUP.md) into a new Claude conversation, after
 ### 4. Vercel
 
 1. At [vercel.com](https://vercel.com), **Add New > Project** and import this repository.
-2. Add the environment variables below, then deploy. Note the address, like `https://collection-tracker-xxxx.vercel.app`.
+2. Add the environment variables below, then deploy. If Claude created the project in step 1, it already added the Supabase URL and publishable key, `ADMIN_EMAILS`, and `CRON_SECRET`: skip step 1, add the other three (`SUPABASE_SECRET_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`), and redeploy. Note the address, like `https://collection-tracker-xxxx.vercel.app`.
 3. Back in the Google client from step 3.5, add that address under **Authorized JavaScript origins**.
 
 | Variable | Value |

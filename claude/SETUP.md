@@ -1,8 +1,8 @@
-Paste everything below the line into a new Claude conversation that has the Google Drive, Google Sheets, and Gmail connectors turned on (Gmail is optional, for price alerts). If you already created your Supabase project (README step 2.1), also turn on the Supabase connector and Claude will set up the database too. Claude builds the sheet, the photo folders, the nightly price check, and the Collection Intake page, then gives you the two links the web app needs.
+Paste everything below the line into a new Claude conversation that has the Google Drive, Google Sheets, and Gmail connectors turned on (Gmail is optional, for price alerts). If you already created your Supabase project (README step 2.1), also turn on the Supabase connector and Claude will set up the database too. With the Vercel connector on, Claude also creates the Vercel project and adds the variables that aren't secret. Claude builds the sheet, the photo folders, the nightly price check, and the Collection Intake page, then gives you the two links the web app needs.
 
 ---
 
-Set up my Collection Tracker. Use the Google Sheets, Google Drive, Gmail, and Supabase connectors (whichever are on), your scheduled task tools, and your artifact tools. The files mentioned below are in https://github.com/jonathanwmendez/collection-tracker (paths are from the repository root). My time zone is: <your time zone, for example America/New_York>.
+Set up my Collection Tracker. Use the Google Sheets, Google Drive, Gmail, Supabase, and Vercel connectors (whichever are on), your scheduled task tools, and your artifact tools. The files mentioned below are in https://github.com/jonathanwmendez/collection-tracker (paths are from the repository root). My time zone is: <your time zone, for example America/New_York>.
 
 1. **Sheet.** Create a Google Sheet named "Collection Tracker", in Roboto, with these tabs. Row 1 holds the headers, frozen and bold. Header colors: navy (#1F3864, white text) for columns I fill in, Claude orange (#D97757, white text) for Market Value (Each), Last Checked, PSA 9 (Each), and PSA 10 (Each), gray (#6B7280, white text) for columns ending in "(Auto)". Format money columns as $#,##0.00 and date columns as mmm d, yyyy.
    - Sports Cards: Player, Year, Brand / Set, Card #, Parallel / Variant, Condition, Grade, Qty, Market Value (Each), Total Value (Auto), Last Checked, eBay Sold (Auto), Status, Photo, Notes, Paid (Each), Sold For (Each), Sold Date, PSA 9 (Each), PSA 10 (Each)
@@ -31,4 +31,11 @@ Set up my Collection Tracker. Use the Google Sheets, Google Drive, Gmail, and Su
 
 5. **Database (only if the Supabase connector is on).** List my Supabase projects and use the one named "collection-tracker" (ask me if there isn't exactly one match; never create a project). Check which migrations are already applied, then apply each remaining file in `supabase/migrations/` in number order, one migration per file, named after the file. Then run the security advisor and tell me about any warnings. If the connector is off, skip this step and remind me to run the migrations myself (README step 2.2).
 
-6. **Finish** by giving me the sheet's link and the Collection Intake link, to paste into the web app's Settings page, and say whether the database is set up.
+6. **Vercel (only if the Vercel connector is on).** Ask me which GitHub repository holds my copy of collection-tracker, then create a Vercel project from it (Next.js, production branch `main`). Add these production environment variables:
+   - `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: from the Supabase connector, if it's on.
+   - `ADMIN_EMAILS`: ask me for my Google account email.
+   - `CRON_SECRET`: generate a random 48-character value and store it as sensitive. Never show it to me.
+
+   Never ask me to paste a secret key into this chat. Tell me to add `SUPABASE_SECRET_KEY`, `GOOGLE_CLIENT_ID`, and `GOOGLE_CLIENT_SECRET` in Vercel myself (README steps 2 and 3), then redeploy. If the connector is off, skip this step (README step 4).
+
+7. **Finish** by giving me the sheet's link and the Collection Intake link, to paste into the web app's Settings page. Say whether the database is set up, and give me the Vercel address if you created the project.
