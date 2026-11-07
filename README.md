@@ -43,7 +43,7 @@ About 30 minutes. Do the steps in order: each one uses an address from the one b
 |---|---|---|
 | Google Sheets | Setup, Collection Intake, price check | Reading and writing the sheet |
 | Google Drive | Setup, Collection Intake | Photo folders and uploads |
-| Gmail | Price check | Price alert emails. Optional: without it, alerts are skipped |
+| Gmail | Price check | Price alert emails. Optional: without it, alerts go in the Price Log tab instead |
 
 Collection Intake also starts the price check right after you approve items, using Claude's own scheduled task tools. Nothing to connect for that.
 
