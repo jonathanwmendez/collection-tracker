@@ -1,7 +1,7 @@
 import type { Photo } from "@/lib/collection";
 
 /** A square photo preview, or the item's initials when it has no photo. */
-export function ItemThumb({ photo, name, size = 64 }: { photo?: Photo; name: string; size?: number }) {
+export function ItemThumb({ photo, name, size = 64, src }: { photo?: Photo; name: string; size?: number; src?: string }) {
   const style = { width: size, height: size };
   if (!photo) {
     const initials = name
@@ -20,7 +20,7 @@ export function ItemThumb({ photo, name, size = 64 }: { photo?: Photo; name: str
     // Previews come from the app's own route (Drive photo shrunk once, then cached), so next/image isn't needed.
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={`/api/photos/${photo.id}/preview`}
+      src={src ?? `/api/photos/${photo.id}/preview`}
       alt=""
       width={size}
       height={size}

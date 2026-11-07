@@ -3,11 +3,14 @@ import { NextResponse, type NextRequest } from "next/server";
 import { canAdmin, roleOf } from "../access";
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL, supabaseConfigured } from "./env";
 
-const PUBLIC_PATHS = ["/login", "/auth", "/api/access-requests"];
+const PUBLIC_PATHS = ["/login", "/auth"];
+// Open to anyone, signed in or not: share links (checked by their token) and access requests.
+const OPEN_PATHS = ["/s", "/api/share", "/api/access-requests"];
 
 /** Refreshes the session cookie on every request and keeps out anyone who isn't signed in and allowed. */
 export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname;
+  if (OPEN_PATHS.some((p) => path === p || path.startsWith(p + "/"))) return NextResponse.next({ request });
   const isPublic = PUBLIC_PATHS.some((p) => path === p || path.startsWith(p + "/"));
 
   if (!supabaseConfigured()) {
@@ -36,8 +39,6 @@ export async function updateSession(request: NextRequest) {
   if (!user) {
     return isPublic ? response : withCookies(response, redirectTo(request, "/login"));
   }
-
-  if (path.startsWith("/api/access-requests")) return response;
 
   const role = await roleOf(supabase, user.email);
   if (!role) {

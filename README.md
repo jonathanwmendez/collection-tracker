@@ -14,7 +14,7 @@ A Google Sheet is the main copy of the collection. Three pieces work on it:
 
 Identifying and pricing run inside Claude, on a Claude subscription. The web app makes no paid AI calls.
 
-**App features:** invite-only accounts with an Admin page and a setup checklist for each new person, sync on open, search, category lists with filters, item pages with photos and price history, edits saved to the sheet (each write checks it still has the right row), delete, queue for repricing, a repricing window kept the same in the app and the sheet, free card prices for Magic, Pokémon, and Yu-Gi-Oh! (Scryfall, Pokémon TCG API, YGOPRODeck), a value dashboard with value over time, and adding items without a photo.
+**App features:** invite-only accounts with an Admin page and a setup checklist for each new person, view-only share links, sync on open, search, category lists with filters, item pages with photos and price history, edits saved to the sheet (each write checks it still has the right row), delete, queue for repricing, a repricing window kept the same in the app and the sheet, free card prices for Magic, Pokémon, and Yu-Gi-Oh! (Scryfall, Pokémon TCG API, YGOPRODeck), a value dashboard with value over time, and adding items without a photo.
 
 **Built with:** Next.js 15, TypeScript, Tailwind CSS, Supabase (Postgres, Auth, Storage), Google Sheets and Drive APIs, Vercel.
 
@@ -29,7 +29,7 @@ Paste [`claude/SETUP.md`](claude/SETUP.md) into a Claude conversation with the G
 ### 2. Supabase
 
 1. Create a project at [supabase.com](https://supabase.com). Under **Security**: keep **Enable Data API** on, turn **Automatically expose new tables** off, turn **Enable automatic RLS** on.
-2. **SQL Editor:** run [`0001_init.sql`](supabase/migrations/0001_init.sql), [`0002_sheet_sync.sql`](supabase/migrations/0002_sheet_sync.sql), and [`0003_access.sql`](supabase/migrations/0003_access.sql), in that order.
+2. **SQL Editor:** run the four files in [`supabase/migrations/`](supabase/migrations) in order: `0001_init.sql`, `0002_sheet_sync.sql`, `0003_access.sql`, `0004_shares.sql`.
 3. **Settings > API Keys:** copy the project URL, a publishable key, and a secret key.
 
 ### 3. Google Cloud
@@ -83,6 +83,10 @@ The Admin page shows each person's progress (signed in, Google, sheet, Intake, s
 
 **About Testing mode:** up to 100 test users can sign in, and Google asks everyone to sign in again every 7 days. Publishing the app removes both limits, but Google requires a verified domain with a privacy policy and terms, plus a review of both scopes, including a yearly third-party security assessment for `drive.readonly`.
 
+## Sharing
+
+**Collection > Share** creates view-only links. For each link, pick the categories, whether values and notes show, and when it expires. Anyone with the link can browse, search, and open items without an account. Links never expose the sheet, Drive links, or anything else in your Google account. The Share page shows each link's views, and **Turn off** disables it for good.
+
 ## Development
 
 ```bash
@@ -102,14 +106,16 @@ For local sign-in, also add `http://localhost:3000` to the Google client's JavaS
 | `src/lib/item-sheet.ts` | Safe row writes that check the row first |
 | `src/lib/prices.ts` | Free card price lookups |
 | `src/lib/access.ts` | Owners, invites, and roles |
+| `src/lib/shares.ts`, `src/app/s/` | Share links and the public view-only pages |
 | `src/app/api/` | Sync, item edit/delete/reprice/price, settings, access requests, admin, account deletion, photo previews |
-| `supabase/migrations/` | Tables: items, photos, price_checks, value_snapshots, settings, google_tokens, members, access_requests |
+| `supabase/migrations/` | Tables: items, photos, price_checks, value_snapshots, settings, google_tokens, members, access_requests, shares |
 | `claude/` | Setup prompt, Collection Intake page, and price check prompt |
-| `tests/` | Unit tests for row parsing, price lookups, access rules, and collection math |
+| `tests/` | Unit tests for row parsing, price lookups, access and share rules, and collection math |
 
 ## Security
 
 - Only owners (`ADMIN_EMAILS`) and invited accounts can sign in, and every table uses row-level security, so each person sees only their own data.
 - Invites and access requests live in tables only the server can read.
+- Share links use random 128-bit tokens, are checked on every request, and only serve the categories and fields the link allows. Share pages are hidden from search engines.
 - Google refresh tokens live in a table only the server can read.
 - Google access: the app asks to edit sheets and view Drive files. It only opens the connected sheet and the photos it links to, and never deletes anything in Drive. Deleting your account also revokes the app's Google access.

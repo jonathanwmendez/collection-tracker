@@ -39,11 +39,16 @@ export default async function CollectionPage({ searchParams }: { searchParams: P
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight">Collection</h1>
-        <p className="text-muted">
-          {plural(totals.items, "item")} worth <span className="font-mono tabular-nums text-ink">{money(totals.total)}</span>
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-bold tracking-tight">Collection</h1>
+          <p className="text-muted">
+            {plural(totals.items, "item")} worth <span className="font-mono tabular-nums text-ink">{money(totals.total)}</span>
+          </p>
+        </div>
+        <Link href="/share" className="min-h-9 inline-flex items-center rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink no-underline">
+          Share
+        </Link>
       </div>
 
       <SyncBar />
