@@ -49,6 +49,8 @@ About 30 minutes. Do the steps in order: each one uses an address from the one b
 
 Collection Intake also starts the price check right after you approve items, using Claude's own scheduled task tools. Nothing to connect for that.
 
+Google Cloud has no connector. If Claude can use a browser where you're signed in to Google Cloud (such as Claude in Chrome), the setup prompt does step 3 for you, except copying the client secret.
+
 ### 1. Claude
 
 Paste [`claude/SETUP.md`](claude/SETUP.md) into a new Claude conversation, after filling in your time zone where the prompt asks for it. It creates the sheet, photo folders, nightly price check, and Collection Intake, and gives you the sheet and Intake links for step 6.
@@ -60,6 +62,8 @@ Paste [`claude/SETUP.md`](claude/SETUP.md) into a new Claude conversation, after
 3. **Settings > API Keys:** copy the project URL, a publishable key, and a secret key.
 
 ### 3. Google Cloud
+
+If Claude did this in step 1, skip to step 4. You still need the client secret you copied.
 
 1. In [Google Cloud Console](https://console.cloud.google.com), create a project and enable the **Google Sheets API** and **Google Drive API**.
 2. **Google Auth Platform > Get started:** app name, support email, audience **External**, contact email.
@@ -74,7 +78,7 @@ Paste [`claude/SETUP.md`](claude/SETUP.md) into a new Claude conversation, after
 ### 4. Vercel
 
 1. At [vercel.com](https://vercel.com), **Add New > Project** and import this repository.
-2. Add the environment variables below, then deploy. If Claude created the project in setup step 1, skip 4.1. Claude already added the Supabase URL and publishable key, `ADMIN_EMAILS`, and `CRON_SECRET`, so add the other three (`SUPABASE_SECRET_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`), and redeploy. Note the address, like `https://collection-tracker-xxxx.vercel.app`.
+2. Add the environment variables below, then deploy. If Claude created the project in setup step 1, skip 4.1. Claude's last message lists the variables it added. Add the rest (at least `SUPABASE_SECRET_KEY` and `GOOGLE_CLIENT_SECRET`) and redeploy. Note the address, like `https://collection-tracker-xxxx.vercel.app`.
 3. Back in the Google client from step 3.5, add that address under **Authorized JavaScript origins**.
 
 | Variable | Value |

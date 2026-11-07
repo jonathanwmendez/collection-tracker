@@ -1,8 +1,8 @@
-Paste everything below the line into a new Claude conversation that has the Google Drive, Google Sheets, and Gmail connectors turned on (Gmail is optional, for price alerts). If you already created your Supabase project (README step 2.1), also turn on the Supabase connector and Claude will set up the database too. With the Vercel connector on, Claude also creates the Vercel project and adds the variables that aren't secret. Claude builds the sheet, the photo folders, the nightly price check, and the Collection Intake page, then gives you the two links the web app needs.
+Paste everything below the line into a new Claude conversation that has the Google Drive, Google Sheets, and Gmail connectors turned on (Gmail is optional, for price alerts). If you already created your Supabase project (README step 2.1), also turn on the Supabase connector and Claude will set up the database too. With the Vercel connector on, Claude also creates the Vercel project and adds the variables that aren't secret. If Claude can use a browser where you're signed in to Google Cloud (such as Claude in Chrome), it can also do the Google Cloud setup, except copying the client secret. Claude builds the sheet, the photo folders, the nightly price check, and the Collection Intake page, then gives you the two links the web app needs.
 
 ---
 
-Set up my Collection Tracker. Use the Google Sheets, Google Drive, Gmail, Supabase, and Vercel connectors (whichever are on), your scheduled task tools, and your artifact tools. The files mentioned below are in https://github.com/jonathanwmendez/collection-tracker (paths are from the repository root). My time zone is: <your time zone, for example America/New_York>.
+Set up my Collection Tracker. Use the Google Sheets, Google Drive, Gmail, Supabase, and Vercel connectors (whichever are on), your scheduled task tools, your artifact tools, and a browser if you have one. The files mentioned below are in https://github.com/jonathanwmendez/collection-tracker (paths are from the repository root). My time zone is: <your time zone, for example America/New_York>.
 
 1. **Sheet.** Create a Google Sheet named "Collection Tracker", in Roboto, with these tabs. Row 1 holds the headers, frozen and bold. Header colors: navy (#1F3864, white text) for columns I fill in, Claude orange (#D97757, white text) for Market Value (Each), Last Checked, PSA 9 (Each), and PSA 10 (Each), gray (#6B7280, white text) for columns ending in "(Auto)". Format money columns as $#,##0.00 and date columns as mmm d, yyyy.
    - Sports Cards: Player, Year, Brand / Set, Card #, Parallel / Variant, Condition, Grade, Qty, Market Value (Each), Total Value (Auto), Last Checked, eBay Sold (Auto), Status, Photo, Notes, Paid (Each), Sold For (Each), Sold Date, PSA 9 (Each), PSA 10 (Each)
@@ -36,6 +36,16 @@ Set up my Collection Tracker. Use the Google Sheets, Google Drive, Gmail, Supaba
    - `ADMIN_EMAILS`: ask me for my Google account email.
    - `CRON_SECRET`: generate a random 48-character value and store it as sensitive. Never show it to me.
 
-   Never ask me to paste a secret key into this chat. Tell me to add `SUPABASE_SECRET_KEY`, `GOOGLE_CLIENT_ID`, and `GOOGLE_CLIENT_SECRET` in Vercel myself (README steps 2 and 3), then redeploy. If the connector is off, skip this step (README step 4).
+   Never ask me to paste a secret key into this chat. I add `SUPABASE_SECRET_KEY` and `GOOGLE_CLIENT_SECRET` in Vercel myself, then redeploy. If the connector is off, skip this step (README step 4).
 
-7. **Finish** by giving me the sheet's link and the Collection Intake link, to paste into the web app's Settings page. Say whether the database is set up, and give me the Vercel address if you created the project.
+7. **Google Cloud (only if you can use a browser where I'm signed in to Google Cloud).** Ask before you start, and stop and ask me if anything looks different from these steps. In https://console.cloud.google.com:
+   - Create a project named "collection-tracker" and enable the Google Sheets API and Google Drive API.
+   - Google Auth Platform > Get started: app name "Collection Tracker", my email as the support and contact email, audience External.
+   - Audience > Test users: add my Google account. Leave the status on Testing. Never publish the app.
+   - Data access > Add or remove scopes > Manually add scopes: `https://www.googleapis.com/auth/spreadsheets` and `https://www.googleapis.com/auth/drive.readonly`, then save.
+   - Clients > Create client, type Web application, name "Collection Tracker". Authorized redirect URI: my Supabase project URL plus `/auth/v1/callback` (from the Supabase connector, or ask me). Authorized JavaScript origin: the Vercel address, if you created the Vercel project.
+   - The client secret is shown only once. Leave that dialog open and tell me to copy the secret now. Don't copy, type, or repeat it anywhere. You can share the client ID. If you created the Vercel project, add `GOOGLE_CLIENT_ID` there.
+
+   If you can't use a browser, skip this step (README step 3).
+
+8. **Finish** by giving me the sheet's link and the Collection Intake link, to paste into the web app's Settings page. Say whether the database is set up, give me the Vercel address if you created the project, and list which secrets I still need to add myself and where.
