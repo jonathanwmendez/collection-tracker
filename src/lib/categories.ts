@@ -86,7 +86,18 @@ export const CATEGORIES: Category[] = [
 ];
 
 export const STATUSES = ["Keep", "Sell", "Listed", "Sold"] as const;
+export type Status = (typeof STATUSES)[number];
 
 export function categoryByName(name: string): Category | undefined {
   return CATEGORIES.find((c) => c.name === name);
+}
+
+/** The item's display name is its category's first field (Player, Card Name, Title, ...). */
+export function nameField(category: Category): string {
+  return category.fields[0]!;
+}
+
+/** Year-like field used in photo file names, if the category has one. */
+export function yearOf(fields: Record<string, string>): string {
+  return (fields["Year"] || fields["Date"] || "").trim();
 }
