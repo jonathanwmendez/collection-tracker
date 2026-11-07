@@ -33,14 +33,25 @@ h1{font-size:24px;font-weight:700;margin:0;letter-spacing:-.01em;text-wrap:balan
 h2{font-size:13px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0}
 .links{display:flex;flex-wrap:wrap;gap:14px;font-size:14px}
 a{color:var(--link);text-underline-offset:2px}
-.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted)}
-.legend span{display:inline-flex;align-items:center;gap:6px}
-.sw{width:10px;height:10px;border-radius:2px;display:inline-block}
-.drop{border:1.5px dashed var(--line);border-radius:14px;background:var(--surface);padding:22px 18px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
+.intro{margin:0;color:var(--muted);font-size:14px;max-width:60ch}
+.how{list-style:none;margin:0;padding:12px 14px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;counter-reset:how;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+@media (max-width:520px){.how{grid-template-columns:minmax(0,1fr);gap:8px}}
+.how li{counter-increment:how;font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:1px;line-height:1.4}
+.how li b{color:var(--ink);font-weight:500;font-size:14px}
+.how li b::before{content:counter(how) ". ";color:var(--muted)}
+.drop{border:1.5px dashed var(--line);border-radius:14px;background:var(--surface);padding:18px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
 .drop.over{border-color:var(--primary);background:var(--primary-soft)}
-.drop p{margin:0;color:var(--muted);font-size:14px;max-width:44ch}
-.drop .multi{flex-direction:row;align-items:center;gap:8px;font-size:14px;color:var(--ink);font-weight:400}
-.drop .multi input{width:20px;height:20px;min-width:20px;padding:0}
+.drop p{margin:0;color:var(--muted);font-size:13px;max-width:48ch}
+.drop fieldset{border:0;margin:0;padding:0;width:100%;min-width:0}
+.drop legend{font-size:13px;font-weight:500;color:var(--muted);margin-bottom:8px;padding:0}
+.modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:100%}
+@media (max-width:420px){.modes{grid-template-columns:minmax(0,1fr)}}
+.mode{flex-direction:row;align-items:flex-start;gap:10px;text-align:left;border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;color:var(--muted);font-weight:400;font-size:13px}
+.mode input{width:18px;height:18px;min-width:18px;margin:2px 0 0;padding:0;accent-color:var(--primary)}
+.mode b{display:block;color:var(--ink);font-weight:500;font-size:14px}
+.mode:has(input:checked){border-color:var(--primary);background:var(--primary-soft)}
+.sub{margin:-4px 0 0;color:var(--muted);font-size:13px}
+.lead{margin:0;font-size:14px;color:var(--ink);font-weight:500}
 button,.btn{font:inherit;font-weight:500;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:10px 16px;min-height:44px;cursor:pointer}
 button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
 button:disabled{opacity:.55;cursor:default}
@@ -99,34 +110,46 @@ textarea{min-height:64px;resize:vertical}
 <div class="wrap">
   <header>
     <h1>Collection Intake</h1>
+    <p class="intro">Add items to your Collection Tracker sheet from photos.</p>
     <div class="links">
       <a href="https://docs.google.com/spreadsheets/d/{{SHEET_ID}}/edit" target="_blank" rel="noopener">Open the sheet</a>
       <a href="https://drive.google.com/drive/folders/{{PHOTOS_FOLDER_ID}}" target="_blank" rel="noopener">Open photo folders</a>
     </div>
-    <div class="legend" aria-label="Color key">
-      <span><i class="sw" style="background:var(--primary)"></i>You check</span>
-      <span><i class="sw" style="background:var(--clay)"></i>Claude estimates</span>
-      <span><i class="sw" style="background:var(--muted)"></i>Filled in later</span>
-    </div>
   </header>
+
+  <ol class="how" aria-label="How it works">
+    <li><b>Add photos</b>Claude reads each photo and fills in the details.</li>
+    <li><b>Check and approve</b>Fix anything wrong. The value is Claude's estimate.</li>
+    <li><b>Saved and priced</b>The item goes in your sheet, then gets a verified price from real sales.</li>
+  </ol>
 
   <div id="banners"></div>
 
   <section class="drop" id="drop" aria-label="Add photos">
-    <p>One photo per item. For a card, add the back to the same item after it appears.</p>
-    <label class="multi"><input type="checkbox" id="multi"> Each photo shows several cards (a binder page or a spread, up to 9)</label>
-    <button class="primary big" id="pick" type="button">Add photos</button>
+    <fieldset>
+      <legend>What's in each photo?</legend>
+      <div class="modes">
+        <label class="mode"><input type="radio" name="mode" value="one" checked><span><b>One item</b>Add the back or other angles after Claude identifies it.</span></label>
+        <label class="mode"><input type="radio" name="mode" value="multi"><span><b>Several cards</b>A binder page or cards laid out, up to 9 per photo.</span></label>
+      </div>
+    </fieldset>
+    <button class="primary big" id="pick" type="button">Take or choose photos</button>
+    <p>You can pick several photos at once. On a computer, you can also drop them here.</p>
     <input id="file" class="sr" type="file" accept="image/*" multiple>
   </section>
 
-  <section class="queue" id="queue" aria-live="polite"></section>
+  <section id="reviewBox" style="display:none;flex-direction:column;gap:10px">
+    <h2 id="reviewHead">To review</h2>
+    <div class="queue" id="queue" aria-live="polite"></div>
+  </section>
 
   <section style="display:flex;flex-direction:column;gap:10px">
     <div class="row" style="justify-content:space-between">
       <h2>Recently added</h2>
-      <button class="ghost" id="refreshAll" type="button">Check prices</button>
+      <button id="refreshAll" type="button">Update prices</button>
     </div>
-    <div class="recent" id="recent"><div class="empty">Items you approve show up here with their verified price once the price check finishes.</div></div>
+    <p class="sub">Verified prices usually arrive a few minutes after you approve. Tap Update prices to load them from the sheet.</p>
+    <div class="recent" id="recent"><div class="empty">Nothing added yet. Items you approve on this device show up here.</div></div>
   </section>
 </div>
 
@@ -260,7 +283,7 @@ drop.addEventListener("dragleave", () => drop.classList.remove("over"));
 drop.addEventListener("drop", e => { e.preventDefault(); drop.classList.remove("over"); addFiles(e.dataTransfer.files); });
 
 function addFiles(list){
-  const multi = document.getElementById("multi").checked;
+  const multi = document.querySelector('input[name="mode"]:checked')?.value === "multi";
   for (const f of list){
     if (!f.type.startsWith("image/")) continue;
     const it = {id: ++seq, photos:[f], rot:[0], state:"queued", draft:null, error:"", steps:[], multi};
@@ -353,6 +376,7 @@ async function identifyMany(it){
       prev = el;
     });
     remove(it);
+    updateReviewHead();
     return;
   } catch (e){
     it.state = "idfail"; it.error = sampleWhy(e);
@@ -377,10 +401,17 @@ async function identify(it){
 
 // ---------- rendering ----------
 const queue = document.getElementById("queue");
+function updateReviewHead(){
+  const box = document.getElementById("reviewBox"), n = items.length;
+  box.style.display = n ? "flex" : "none";
+  const waiting = items.filter(x => x.state === "draft" || x.state === "dup").length;
+  document.getElementById("reviewHead").textContent = waiting ? `To review (${waiting})` : "In progress";
+}
 function render(it){
   let card = document.getElementById("item-" + it.id);
   const fresh = h("article", {class:"card", id:"item-" + it.id, "aria-label":"Item " + it.id}, ...cardBody(it));
   if (card) card.replaceWith(fresh); else queue.prepend(fresh);
+  updateReviewHead();
 }
 function thumbs(it, editable){
   return h("div", {class:"thumbs"}, it.photos.map((f, i) => h("figure", {class:"thumb"},
@@ -391,7 +422,7 @@ function thumbs(it, editable){
 
 function cardBody(it){
   if (it.state === "queued" || it.state === "identifying")
-    return [thumbs(it), h("div", {class:"state"}, h("i", {class:"dot"}), "Identifying the item. This usually takes 15 to 60 seconds.")];
+    return [thumbs(it), h("div", {class:"state"}, h("i", {class:"dot"}), it.multi ? "Finding each card in the photo. This usually takes 30 to 90 seconds." : "Identifying the item. This usually takes 15 to 60 seconds.")];
   if (it.state === "idfail")
     return [thumbs(it), h("div", {class:"err"}, it.error),
       h("div", {class:"row"}, h("button", {type:"button", onclick: () => identify(it)}, "Identify again"),
@@ -411,7 +442,7 @@ function cardBody(it){
       it.state === "savefail" ? h("div", {class:"row"},
         h("button", {type:"button", class:"primary", onclick: () => approve(it)}, "Try again"),
         h("button", {type:"button", class:"ghost", onclick: () => { it.state = "draft"; it.error = ""; render(it); }}, "Back to edit")) : null,
-      it.state === "saved" ? h("div", {class:"row"}, h("button", {type:"button", class:"ghost", onclick: () => remove(it)}, "Dismiss")) : null];
+      it.state === "saved" ? h("div", {class:"row"}, h("span", {class:"est"}, "Done. It's listed under Recently added."), h("button", {type:"button", class:"ghost", onclick: () => remove(it)}, "Dismiss")) : null];
   return draftForm(it);
 }
 
@@ -431,27 +462,28 @@ function draftForm(it){
   const range = d.range.length === 2 && d.range[1] > 0 ? `Likely range $${d.range[0]} to $${d.range[1]}.` : "";
   return [
     thumbs(it, !it.group),
+    h("p", {class:"lead"}, "Check the details, then approve."),
     it.error ? h("div", {class:"err"}, it.error) : null,
     h("div", {class:"row"}, h("span", {class:"pill " + d.confidence}, `${d.confidence[0].toUpperCase() + d.confidence.slice(1)} confidence`),
       it.group ? h("span", {class:"pill"}, it.label ? `From a ${it.group.count}-item photo, ${it.label}` : `From a ${it.group.count}-item photo`) : null),
     d.uncertain ? h("div", {class:"note"}, "Check this: " + d.uncertain) : null,
     d.newCategory ? h("div", {class:"note info"}, `Suggested new category: ${d.newCategory}. It's going in Other for now. Ask Claude in chat to add the tab if you want it.`) : null,
     h("div", {class:"grid"},
-      h("label", {class:"full"}, "Tab", tabSel),
+      h("label", {class:"full"}, "Category (sheet tab)", tabSel),
       ...fieldEls,
       h("label", {}, "Condition", condSel),
       h("label", {}, "Qty", h("input", {id: pre + "qty", type:"number", min:"1", step:"1", inputmode:"numeric", value:String(d.qty), oninput: e => { d.qty = e.target.value; }})),
-      h("label", {class:"clay"}, h("span", {class:"k"}, "Estimated value (each)"),
+      h("label", {class:"clay"}, h("span", {class:"k"}, "Claude's estimate (each, $)"),
         h("input", {id: pre + "est", type:"number", min:"0", step:"0.01", inputmode:"decimal", value:String(d.estimate), oninput: e => { d.estimate = e.target.value; }})),
       h("label", {}, "Status", h("select", {id: pre + "status", onchange: e => { d.status = e.target.value; }},
         STATUSES.map(s => h("option", {value:s, selected: s === d.status}, s)))),
-      h("label", {}, "Paid (each, optional)", h("input", {id: pre + "paid", type:"number", min:"0", step:"0.01", inputmode:"decimal", value:String(d.paid ?? ""), oninput: e => { d.paid = e.target.value; }})),
-      h("div", {class:"est full"}, `${range} Verified against real sales after you approve.`),
+      h("label", {}, "What you paid (each, optional)", h("input", {id: pre + "paid", type:"number", min:"0", step:"0.01", inputmode:"decimal", value:String(d.paid ?? ""), oninput: e => { d.paid = e.target.value; }})),
+      h("div", {class:"est full"}, `${range ? range + " " : ""}This is a guess. After you approve, the price check replaces it with a price from real sales.`),
       h("label", {class:"full"}, "Notes", h("textarea", {id: pre + "notes", oninput: e => { d.notes = e.target.value; }}, d.notes)),
     ),
     h("div", {class:"row"},
-      h("button", {type:"button", class:"primary", onclick: () => approve(it)}, "Approve and add"),
-      it.group ? null : h("button", {type:"button", onclick: () => addMore(it)}, "Add another photo"),
+      h("button", {type:"button", class:"primary", onclick: () => approve(it)}, "Approve and save"),
+      it.group ? null : h("button", {type:"button", onclick: () => addMore(it)}, "Add a photo (back or angle)"),
       it.group ? null : h("button", {type:"button", class:"ghost", onclick: () => identify(it)}, "Identify again"),
       h("button", {type:"button", class:"ghost", onclick: () => remove(it)}, "Discard")),
   ];
@@ -473,6 +505,7 @@ function addMore(it){
 function remove(it){
   const i = items.indexOf(it); if (i >= 0) items.splice(i, 1);
   document.getElementById("item-" + it.id)?.remove();
+  updateReviewHead();
 }
 
 // ---------- duplicates ----------
@@ -651,7 +684,7 @@ function remember(r){ recent = [r, ...recent.filter(x => !(x.tab === r.tab && x.
 function renderRecent(){
   const box = document.getElementById("recent");
   box.replaceChildren();
-  if (!recent.length){ box.append(h("div", {class:"empty"}, "Items you approve show up here with their verified price once the price check finishes.")); return; }
+  if (!recent.length){ box.append(h("div", {class:"empty"}, "Nothing added yet. Items you approve on this device show up here.")); return; }
   for (const r of recent){
     let priceEl;
     if (r.verified) priceEl = h("span", {class:"price ok"}, `${r.value} verified`);
@@ -667,7 +700,7 @@ renderRecent();
 document.getElementById("refreshAll").onclick = async (ev) => {
   const btn = ev.currentTarget;
   if (!mcp){ banner("Connectors aren't available in this view, so prices can't be checked here."); return; }
-  btn.disabled = true; btn.textContent = "Checking…";
+  btn.disabled = true; btn.textContent = "Updating…";
   for (const r of recent.slice(0, 15)){
     const cols = TABS[r.tab]?.cols; if (!cols) continue;
     try {
@@ -682,7 +715,7 @@ document.getElementById("refreshAll").onclick = async (ev) => {
     } catch (e){ r.checkErr = e?.code === "server_unavailable" ? "Sheets didn't respond" : "Couldn't check"; }
   }
   saveRecent(recent); renderRecent();
-  btn.disabled = false; btn.textContent = "Check prices";
+  btn.disabled = false; btn.textContent = "Update prices";
 };
 })();
 </script>
