@@ -9,12 +9,12 @@ A Google Sheet is the main copy of the collection. Three pieces work on it:
 | Piece | Runs on | What it does |
 |---|---|---|
 | **Collection Intake** | A Claude artifact | Take a photo. Claude identifies the item and estimates its value. You approve, and it saves the photo to Drive and a row to the sheet |
-| **Price check** | A Claude scheduled task, nightly at 3:30 AM, plus right after each approval | Prices new rows from recent sold listings, rechecks prices older than 30 days, notes its sources, and logs each run |
+| **Price check** | A Claude scheduled task, nightly at 3:30 AM, plus right after each approval | Prices new rows from recent sold listings, then rechecks the oldest prices past the repricing window (30 days by default) until 8:00 AM. Notes its sources and logs each run, with tokens used, to a Price Log tab |
 | **This web app** | Vercel + Supabase | Syncs from the sheet to browse, search, edit, and value the collection |
 
 Identifying and pricing run inside Claude, on a Claude subscription. The web app makes no paid AI calls.
 
-**App features:** invite-only accounts with an Admin page and a setup checklist for each new person, sync on open, search, category lists with filters, item pages with photos and price history, edits saved to the sheet (each write checks it still has the right row), delete, queue for repricing, free card prices for Magic, Pokémon, and Yu-Gi-Oh! (Scryfall, Pokémon TCG API, YGOPRODeck), a value dashboard with value over time, and adding items without a photo.
+**App features:** invite-only accounts with an Admin page and a setup checklist for each new person, sync on open, search, category lists with filters, item pages with photos and price history, edits saved to the sheet (each write checks it still has the right row), delete, queue for repricing, a repricing window kept the same in the app and the sheet, free card prices for Magic, Pokémon, and Yu-Gi-Oh! (Scryfall, Pokémon TCG API, YGOPRODeck), a value dashboard with value over time, and adding items without a photo.
 
 **Built with:** Next.js 15, TypeScript, Tailwind CSS, Supabase (Postgres, Auth, Storage), Google Sheets and Drive APIs, Vercel.
 
@@ -24,7 +24,7 @@ About 30 minutes. Do the steps in order: each one uses an address from the one b
 
 ### 1. Claude
 
-Paste [`claude/SETUP.md`](claude/SETUP.md) into a Claude conversation with the Google Drive and Google Sheets connectors on. It creates the sheet, photo folders, nightly price check, and Collection Intake, and gives you the sheet and Intake links for step 6.
+Paste [`claude/SETUP.md`](claude/SETUP.md) into a Claude conversation with the Google Drive and Google Sheets connectors on, after filling in your time zone where the prompt asks for it. It creates the sheet, photo folders, nightly price check, and Collection Intake, and gives you the sheet and Intake links for step 6.
 
 ### 2. Supabase
 
@@ -97,18 +97,19 @@ For local sign-in, also add `http://localhost:3000` to the Google client's JavaS
 | Path | What's there |
 |---|---|
 | `src/lib/sheet-format.ts` | Reading and writing sheet rows. Columns are found by header, so they can move |
+| `src/lib/sheets.ts` | Google Sheets API calls, including the repricing window on the Summary tab |
 | `src/lib/sync.ts` | Sheet-to-database sync, price history, daily value snapshots |
-| `src/lib/prices.ts` | Free card price lookups |
 | `src/lib/item-sheet.ts` | Safe row writes that check the row first |
-| `src/app/api/` | Sync, item edit/delete/reprice/price, settings, photo previews |
-| `supabase/migrations/` | Tables: items, photos, price_checks, value_snapshots, settings, google_tokens, members, access_requests |
+| `src/lib/prices.ts` | Free card price lookups |
 | `src/lib/access.ts` | Owners, invites, and roles |
+| `src/app/api/` | Sync, item edit/delete/reprice/price, settings, access requests, admin, account deletion, photo previews |
+| `supabase/migrations/` | Tables: items, photos, price_checks, value_snapshots, settings, google_tokens, members, access_requests |
 | `claude/` | Setup prompt, Collection Intake page, and price check prompt |
-| `tests/` | Unit tests for row parsing, price lookups, and collection math |
+| `tests/` | Unit tests for row parsing, price lookups, access rules, and collection math |
 
 ## Security
 
 - Only owners (`ADMIN_EMAILS`) and invited accounts can sign in, and every table uses row-level security, so each person sees only their own data.
 - Invites and access requests live in tables only the server can read.
 - Google refresh tokens live in a table only the server can read.
-- Google access is limited to reading and updating sheets, and reading Drive files (for photo previews). The app never deletes Drive files.
+- Google access: the app asks to edit sheets and view Drive files. It only opens the connected sheet and the photos it links to, and never deletes anything in Drive. Deleting your account also revokes the app's Google access.
