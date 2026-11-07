@@ -16,9 +16,9 @@ export default async function AddPage() {
     return (
       <div className="flex flex-col gap-6">
         <h1 className="text-2xl font-bold tracking-tight">Add items</h1>
-        <EmptyState title="Connect your Google Sheet first" body="New items are saved to your Collection Tracker sheet. Paste its link in Settings.">
-          <Link href="/settings" className="mt-1 inline-flex min-h-11 items-center rounded-xl bg-navy px-5 font-medium text-navy-ink no-underline">
-            Open Settings
+        <EmptyState title="Connect your Google Sheet first" body="New items are saved to your Collection Tracker sheet. The setup checklist walks you through connecting it.">
+          <Link href="/setup" className="mt-1 inline-flex min-h-11 items-center rounded-xl bg-navy px-5 font-medium text-navy-ink no-underline">
+            Open setup
           </Link>
         </EmptyState>
       </div>
@@ -49,7 +49,7 @@ export default async function AddPage() {
           </a>
         ) : (
           <Link
-            href="/settings"
+            href="/setup"
             className="min-h-12 w-full max-w-sm inline-flex items-center justify-center rounded-xl bg-navy px-6 text-base font-medium text-navy-ink no-underline"
           >
             Add your Collection Intake link

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isAllowedEmail } from "@/lib/supabase/env";
+import { roleOf } from "@/lib/access";
 
 /**
  * Google sends people back here after sign-in. We swap the one-time code for a session and
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   if (error || !data.session) return NextResponse.redirect(`${origin}/login?error=sign_in_failed`);
 
   const user = data.session.user;
-  if (!isAllowedEmail(user.email)) {
+  if (!(await roleOf(supabase, user.email))) {
     await supabase.auth.signOut();
     return NextResponse.redirect(`${origin}/login?error=not_allowed`);
   }
@@ -34,5 +34,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.redirect(`${origin}/collection`);
+  // New people go to the setup checklist until their sheet is connected.
+  const { data: settings } = await supabase.from("settings").select("sheet_id").eq("user_id", user.id).maybeSingle();
+  return NextResponse.redirect(`${origin}${settings?.sheet_id ? "/collection" : "/setup"}`);
 }

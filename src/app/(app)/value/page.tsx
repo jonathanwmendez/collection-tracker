@@ -24,7 +24,7 @@ export default async function ValuePage() {
         <h1 className="text-2xl font-bold tracking-tight">Value</h1>
         {settings.sheet_id && <SyncBar />}
         <EmptyState title="Nothing to total yet" body="Once items are in your sheet and synced, this shows your collection's value and how it changes over time.">
-          <Link href={settings.sheet_id ? "/add" : "/settings"} className="mt-1 inline-flex min-h-11 items-center rounded-xl bg-navy px-5 font-medium text-navy-ink no-underline">
+          <Link href={settings.sheet_id ? "/add" : "/setup"} className="mt-1 inline-flex min-h-11 items-center rounded-xl bg-navy px-5 font-medium text-navy-ink no-underline">
             {settings.sheet_id ? "Add an item" : "Connect your sheet"}
           </Link>
         </EmptyState>

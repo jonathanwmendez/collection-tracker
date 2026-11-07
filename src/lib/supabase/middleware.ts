@@ -1,8 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { isAllowedEmail, SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL, supabaseConfigured } from "./env";
+import { canAdmin, roleOf } from "../access";
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL, supabaseConfigured } from "./env";
 
-const PUBLIC_PATHS = ["/login", "/auth"];
+const PUBLIC_PATHS = ["/login", "/auth", "/api/access-requests"];
 
 /** Refreshes the session cookie on every request and keeps out anyone who isn't signed in and allowed. */
 export async function updateSession(request: NextRequest) {
@@ -36,9 +37,15 @@ export async function updateSession(request: NextRequest) {
     return isPublic ? response : withCookies(response, redirectTo(request, "/login"));
   }
 
-  if (!isAllowedEmail(user.email)) {
+  if (path.startsWith("/api/access-requests")) return response;
+
+  const role = await roleOf(supabase, user.email);
+  if (!role) {
     await supabase.auth.signOut();
     return withCookies(response, redirectTo(request, "/login", { error: "not_allowed" }));
+  }
+  if ((path === "/admin" || path.startsWith("/admin/")) && !canAdmin(role)) {
+    return withCookies(response, redirectTo(request, "/collection"));
   }
 
   if (path === "/login") return withCookies(response, redirectTo(request, "/collection"));

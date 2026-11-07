@@ -6,16 +6,6 @@ export function supabaseConfigured(): boolean {
   return Boolean(SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY);
 }
 
-/** Emails allowed to use the app, from ALLOWED_EMAILS (comma-separated). Empty means nobody. */
-export function isAllowedEmail(email: string | null | undefined): boolean {
-  if (!email) return false;
-  const allowed = (process.env.ALLOWED_EMAILS ?? "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-  return allowed.includes(email.toLowerCase());
-}
-
 /**
  * Google access requested at sign-in:
  * - spreadsheets: read and update the Collection Tracker sheet

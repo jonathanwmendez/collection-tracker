@@ -1,7 +1,10 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { canAdmin, roleOf } from "@/lib/access";
 import { getSettings } from "@/lib/data";
 import { sheetLink } from "@/lib/collection";
 import { SettingsForm } from "@/components/settings-form";
+import { DeleteAccount } from "@/components/delete-account";
 import { SyncBar } from "@/components/sync";
 
 export const metadata = { title: "Settings · Collection Tracker" };
@@ -14,10 +17,16 @@ export default async function SettingsPage() {
     },
     settings,
   ] = await Promise.all([supabase.auth.getUser(), getSettings(supabase)]);
+  const admin = canAdmin(await roleOf(supabase, user?.email));
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+      <div className="flex flex-col gap-1">
+        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+        <Link href="/setup" className="text-sm">
+          Setup checklist
+        </Link>
+      </div>
 
       <section className="rounded-2xl border border-line bg-surface p-4 flex flex-col gap-4">
         <h2 className="font-medium">Links</h2>
@@ -39,6 +48,16 @@ export default async function SettingsPage() {
         </section>
       )}
 
+      {admin && (
+        <section className="rounded-2xl border border-line bg-surface p-4 flex flex-col gap-3">
+          <h2 className="font-medium">Admin</h2>
+          <p className="text-sm text-muted">Approve access requests, invite people, and see everyone&apos;s setup progress.</p>
+          <Link href="/admin" className="self-start min-h-11 inline-flex items-center rounded-xl border border-line bg-surface px-4 font-medium text-ink no-underline">
+            Open Admin
+          </Link>
+        </section>
+      )}
+
       <section className="rounded-2xl border border-line bg-surface p-4 flex flex-col gap-3">
         <h2 className="font-medium">Account</h2>
         <p className="text-sm">
@@ -53,6 +72,7 @@ export default async function SettingsPage() {
             Sign out
           </button>
         </form>
+        <DeleteAccount />
       </section>
     </div>
   );

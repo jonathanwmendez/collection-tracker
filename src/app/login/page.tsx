@@ -1,8 +1,9 @@
+import { RequestAccess } from "./request-access";
 import { SignInButton } from "./sign-in-button";
 import { supabaseConfigured } from "@/lib/supabase/env";
 
 const MESSAGES: Record<string, string> = {
-  not_allowed: "That Google account doesn't have access to this app.",
+  not_allowed: "That Google account hasn't been invited yet. Request access below.",
   not_configured: "The app isn't connected to Supabase yet. Add the Supabase settings and redeploy.",
   sign_in_failed: "Sign-in didn't finish. Try again.",
   missing_code: "Sign-in didn't finish. Try again.",
@@ -24,7 +25,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           </div>
           <h1 className="text-3xl font-bold tracking-tight text-balance">Collection Tracker</h1>
           <p className="text-muted">
-            Photograph an item, check what Claude found, and it&apos;s cataloged with a verified price.
+            Photograph an item, check what Claude found, and it&apos;s cataloged with a price verified against real sales.
           </p>
         </div>
 
@@ -36,8 +37,11 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
 
         <SignInButton disabled={!ready} />
 
+        <RequestAccess open={error === "not_allowed"} />
+
         <p className="text-xs text-muted">
-          The app asks Google for access only to the photos and sheet it works with, not the rest of your Drive.
+          Google will ask to let the app see your Drive files and edit your sheets. The app only opens your Collection Tracker sheet and the
+          photos it links to, and never deletes anything.
         </p>
       </div>
     </main>

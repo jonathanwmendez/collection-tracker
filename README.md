@@ -14,7 +14,7 @@ A Google Sheet is the main copy of the collection. Three pieces work on it:
 
 Identifying and pricing run inside Claude, on a Claude subscription. The web app makes no paid AI calls.
 
-**App features:** sync on open, search, category lists with filters, item pages with photos and price history, edits saved to the sheet (each write checks it still has the right row), delete, queue for repricing, free card prices for Magic, Pokémon, and Yu-Gi-Oh! (Scryfall, Pokémon TCG API, YGOPRODeck), a value dashboard with value over time, and adding items without a photo.
+**App features:** invite-only accounts with an Admin page and a setup checklist for each new person, sync on open, search, category lists with filters, item pages with photos and price history, edits saved to the sheet (each write checks it still has the right row), delete, queue for repricing, free card prices for Magic, Pokémon, and Yu-Gi-Oh! (Scryfall, Pokémon TCG API, YGOPRODeck), a value dashboard with value over time, and adding items without a photo.
 
 **Built with:** Next.js 15, TypeScript, Tailwind CSS, Supabase (Postgres, Auth, Storage), Google Sheets and Drive APIs, Vercel.
 
@@ -29,7 +29,7 @@ Paste [`claude/SETUP.md`](claude/SETUP.md) into a Claude conversation with the G
 ### 2. Supabase
 
 1. Create a project at [supabase.com](https://supabase.com). Under **Security**: keep **Enable Data API** on, turn **Automatically expose new tables** off, turn **Enable automatic RLS** on.
-2. **SQL Editor:** run [`0001_init.sql`](supabase/migrations/0001_init.sql), then [`0002_sheet_sync.sql`](supabase/migrations/0002_sheet_sync.sql).
+2. **SQL Editor:** run [`0001_init.sql`](supabase/migrations/0001_init.sql), [`0002_sheet_sync.sql`](supabase/migrations/0002_sheet_sync.sql), and [`0003_access.sql`](supabase/migrations/0003_access.sql), in that order.
 3. **Settings > API Keys:** copy the project URL, a publishable key, and a secret key.
 
 ### 3. Google Cloud
@@ -55,7 +55,7 @@ Paste [`claude/SETUP.md`](claude/SETUP.md) into a Claude conversation with the G
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase publishable key |
 | `SUPABASE_SECRET_KEY` | Supabase secret key |
-| `ALLOWED_EMAILS` | Google accounts allowed to sign in, comma-separated |
+| `ADMIN_EMAILS` | Your Google account (the owner). Comma-separate to add more owners |
 | `GOOGLE_CLIENT_ID` | Google client ID |
 | `GOOGLE_CLIENT_SECRET` | Google client secret |
 | `POKEMONTCG_API_KEY` | Optional, raises the Pokémon price lookup limit ([pokemontcg.io](https://pokemontcg.io)) |
@@ -69,9 +69,19 @@ If you change a variable later, redeploy for it to take effect.
 
 ### 6. First sign-in
 
-Open your Vercel address and sign in with Google. You'll see "Google hasn't verified this app": choose **Continue** and allow access. Open **Settings** (your initials, top right), paste the sheet and Collection Intake links from step 1, and save. The first sync starts on its own.
+Open your Vercel address and sign in with Google. You'll see "Google hasn't verified this app": choose **Continue** and allow access. The setup checklist opens: paste the sheet and Collection Intake links from step 1 and save. The first sync starts on its own.
 
-**About Testing mode:** only your test users can sign in, and Google asks you to sign in again every 7 days. Publishing the app removes that, but Google requires a verified domain with a privacy policy and terms, plus a review of both scopes.
+## Adding people
+
+Everyone uses their own Google account and their own Claude plan. Their data stays separate.
+
+1. They open the app and use **Request access** on the login page, or you invite them on the **Admin** page (Settings > Open Admin).
+2. Approve or invite them on the Admin page. Then add their email under **Google Auth Platform > Audience > Test users**. Google doesn't let apps change that list, so the Admin page links to it.
+3. They sign in, and the setup checklist walks them through the rest, including a button that copies the Claude setup prompt.
+
+The Admin page shows each person's progress (signed in, Google, sheet, Intake, synced) and lets you make admins or remove access. Anyone can delete their own account and app data from Settings.
+
+**About Testing mode:** up to 100 test users can sign in, and Google asks everyone to sign in again every 7 days. Publishing the app removes both limits, but Google requires a verified domain with a privacy policy and terms, plus a review of both scopes, including a yearly third-party security assessment for `drive.readonly`.
 
 ## Development
 
@@ -91,12 +101,14 @@ For local sign-in, also add `http://localhost:3000` to the Google client's JavaS
 | `src/lib/prices.ts` | Free card price lookups |
 | `src/lib/item-sheet.ts` | Safe row writes that check the row first |
 | `src/app/api/` | Sync, item edit/delete/reprice/price, settings, photo previews |
-| `supabase/migrations/` | Tables: items, photos, price_checks, value_snapshots, settings, google_tokens |
+| `supabase/migrations/` | Tables: items, photos, price_checks, value_snapshots, settings, google_tokens, members, access_requests |
+| `src/lib/access.ts` | Owners, invites, and roles |
 | `claude/` | Setup prompt, Collection Intake page, and price check prompt |
 | `tests/` | Unit tests for row parsing, price lookups, and collection math |
 
 ## Security
 
-- Only accounts in `ALLOWED_EMAILS` can sign in, and every table uses row-level security.
+- Only owners (`ADMIN_EMAILS`) and invited accounts can sign in, and every table uses row-level security, so each person sees only their own data.
+- Invites and access requests live in tables only the server can read.
 - Google refresh tokens live in a table only the server can read.
 - Google access is limited to reading and updating sheets, and reading Drive files (for photo previews). The app never deletes Drive files.

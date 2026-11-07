@@ -22,10 +22,10 @@ export default async function CollectionPage({ searchParams }: { searchParams: P
         <h1 className="text-2xl font-bold tracking-tight">Collection</h1>
         <EmptyState
           title="Connect your Google Sheet"
-          body="The app shows the items in your Collection Tracker sheet. Paste the sheet's link in Settings to get started."
+          body="The app shows the items in your Collection Tracker sheet. The setup checklist walks you through connecting it."
         >
-          <Link href="/settings" className="mt-1 inline-flex min-h-11 items-center rounded-xl bg-navy px-5 font-medium text-navy-ink no-underline">
-            Open Settings
+          <Link href="/setup" className="mt-1 inline-flex min-h-11 items-center rounded-xl bg-navy px-5 font-medium text-navy-ink no-underline">
+            Open setup
           </Link>
         </EmptyState>
       </div>
