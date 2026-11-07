@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { CATEGORIES } from "./categories";
 import { getGoogleAccessToken } from "./google";
 import { parseRow, priceSummary, todayISO, type SheetItem } from "./sheet-format";
-import { getTabs, readTabs } from "./sheets";
+import { getTabs, readRepriceDays, readTabs } from "./sheets";
 
 export class SyncError extends Error {
   constructor(
@@ -35,7 +35,11 @@ const chunks = <T,>(list: T[]) => Array.from({ length: Math.ceil(list.length / C
  * and rows deleted there disappear. Price changes are recorded so the app can chart them.
  */
 export async function syncCollection(supabase: SupabaseClient, userId: string): Promise<SyncResult> {
-  const { data: settings } = await supabase.from("settings").select("sheet_id").eq("user_id", userId).maybeSingle();
+  const { data: settings } = await supabase
+    .from("settings")
+    .select("sheet_id, reprice_after_days")
+    .eq("user_id", userId)
+    .maybeSingle();
   const sheetId = settings?.sheet_id as string | undefined;
   if (!sheetId) throw new SyncError("Connect your Google Sheet in Settings first.", 400);
 
@@ -45,7 +49,10 @@ export async function syncCollection(supabase: SupabaseClient, userId: string): 
   const missingTabs = CATEGORIES.map((c) => c.name).filter((n) => !(n in tabs));
   if (present.length === 0) throw new SyncError("That sheet has none of the category tabs. Check the link in Settings.", 400);
 
-  const data = await readTabs(token, sheetId, present);
+  const [data, sheetDays] = await Promise.all([
+    readTabs(token, sheetId, present),
+    "Summary" in tabs ? readRepriceDays(token, sheetId) : Promise.resolve(null),
+  ]);
   const sheetItems: SheetItem[] = [];
   for (const tab of present) {
     const { headers, rows } = data[tab]!;
@@ -177,7 +184,12 @@ export async function syncCollection(supabase: SupabaseClient, userId: string): 
 
   const { error: setErr } = await supabase
     .from("settings")
-    .update({ last_synced_at: now, sheet_tabs: tabs })
+    // A repricing window changed in the sheet carries over to the app, so both stay the same.
+    .update({
+      last_synced_at: now,
+      sheet_tabs: tabs,
+      ...(sheetDays && sheetDays !== settings?.reprice_after_days ? { reprice_after_days: sheetDays } : {}),
+    })
     .eq("user_id", userId);
   if (setErr) console.error("Couldn't save sync time", setErr);
 

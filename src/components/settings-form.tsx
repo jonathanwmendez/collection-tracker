@@ -22,13 +22,18 @@ export function SettingsForm({ sheetUrl, intakeUrl, repriceDays }: { sheetUrl: s
     setSaving(true);
     setMsg(null);
     const sheetChanged = sheet.trim() !== sheetUrl;
-    const r = await api<{ sheetTitle?: string }>("/api/settings", {
+    const r = await api<{ sheetTitle?: string; sheetNote?: string }>("/api/settings", {
       method: "POST",
       json: { ...(sheetChanged ? { sheet } : {}), intakeUrl: intake, repriceAfterDays: days },
     });
     setSaving(false);
     if (!r.ok) return setMsg({ kind: "bad", text: r.error, needsSignIn: r.needsSignIn });
-    setMsg({ kind: "ok", text: r.data.sheetTitle ? `Connected to “${r.data.sheetTitle}”. Syncing now.` : "Saved." });
+    setMsg({
+      kind: "ok",
+      text: [r.data.sheetTitle ? `Connected to “${r.data.sheetTitle}”. Syncing now.` : r.data.sheetNote ? "" : "Saved to the app and your sheet.", r.data.sheetNote]
+        .filter(Boolean)
+        .join(" "),
+    });
     // Once the page knows a sheet is connected, the sync provider runs the first sync on its own.
     router.refresh();
     if (sheetChanged && sheetUrl) void sync();
@@ -49,7 +54,7 @@ export function SettingsForm({ sheetUrl, intakeUrl, repriceDays }: { sheetUrl: s
       <label className="flex flex-col gap-1 text-sm font-medium">
         Reprice after (days)
         <input className={`${input} max-w-32`} type="number" min={1} max={3650} value={days} onChange={(e) => setDays(e.target.value)} inputMode="numeric" />
-        <span className="text-xs font-normal text-muted">Prices older than this are flagged as due for another check.</span>
+        <span className="text-xs font-normal text-muted">Prices older than this are rechecked by the nightly price check. Saved to your sheet too, so both always match.</span>
       </label>
       {msg && (
         <Notice kind={msg.kind} needsSignIn={msg.needsSignIn}>

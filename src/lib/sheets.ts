@@ -91,3 +91,34 @@ export async function deleteRow(token: string, sheetId: string, gid: number, row
     }),
   });
 }
+
+const REPRICE_LABEL = "reprice after (days)";
+
+/**
+ * Finds the "Reprice After (Days)" setting on the Summary tab. The nightly price check reads it there,
+ * so the app keeps it and its own setting the same. Returns null when the sheet has no such row.
+ */
+async function findRepriceCell(token: string, sheetId: string): Promise<{ row: number; days: number | null } | null> {
+  const res = await sheetsFetch(
+    token,
+    `${BASE}/${encodeURIComponent(sheetId)}/values/${encodeURIComponent("'Summary'!A1:B20")}?valueRenderOption=UNFORMATTED_VALUE`,
+  ).catch(() => null);
+  if (!res) return null;
+  const rows = ((await res.json()) as { values?: unknown[][] }).values ?? [];
+  const i = rows.findIndex((r) => String(r[0] ?? "").trim().toLowerCase() === REPRICE_LABEL);
+  if (i < 0) return null;
+  const n = Math.round(Number(rows[i]![1]));
+  return { row: i + 1, days: Number.isFinite(n) && n > 0 ? n : null };
+}
+
+export async function readRepriceDays(token: string, sheetId: string): Promise<number | null> {
+  return (await findRepriceCell(token, sheetId))?.days ?? null;
+}
+
+/** Writes the app's repricing window to the sheet. Returns false when the sheet has no setting row. */
+export async function writeRepriceDays(token: string, sheetId: string, days: number): Promise<boolean> {
+  const cell = await findRepriceCell(token, sheetId);
+  if (!cell) return false;
+  await writeMany(token, sheetId, [{ tab: "Summary", row: cell.row, col: 1, value: days }]);
+  return true;
+}

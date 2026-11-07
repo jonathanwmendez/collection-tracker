@@ -3,7 +3,7 @@ import { jsonError, requireUser } from "@/lib/api-auth";
 import { errorResponse } from "@/lib/api-errors";
 import { getGoogleAccessToken } from "@/lib/google";
 import { sheetIdFrom } from "@/lib/sheet-format";
-import { getTabs } from "@/lib/sheets";
+import { getTabs, writeRepriceDays } from "@/lib/sheets";
 import { CATEGORIES } from "@/lib/categories";
 
 /** Saves the sheet link, the Collection Intake link, and the repricing window. Checks the sheet before saving. */
@@ -47,12 +47,25 @@ export async function POST(request: Request) {
       update.reprice_after_days = days;
     }
 
+    // Keep the sheet's "Reprice After (Days)" (read by the nightly price check) the same as the app's setting.
+    let sheetNote: string | undefined;
+    if (update.reprice_after_days !== undefined) {
+      const sheetId =
+        (update.sheet_id as string | undefined) ??
+        ((await supabase.from("settings").select("sheet_id").eq("user_id", user.id).maybeSingle()).data?.sheet_id as string | undefined);
+      if (sheetId) {
+        const token = await getGoogleAccessToken(user.id);
+        const written = await writeRepriceDays(token, sheetId, update.reprice_after_days as number);
+        if (!written) sheetNote = "Saved in the app. Your sheet has no \"Reprice After (Days)\" row on its Summary tab, so the price check uses 30 days.";
+      }
+    }
+
     const { error } = await supabase.from("settings").upsert(update, { onConflict: "user_id" });
     if (error) {
       console.error("Save settings failed", error);
       return jsonError("Couldn't save the settings.", 500);
     }
-    return NextResponse.json({ ok: true, sheetTitle });
+    return NextResponse.json({ ok: true, sheetTitle, sheetNote });
   } catch (e) {
     return errorResponse(e, "Couldn't save the settings.");
   }
