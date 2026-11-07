@@ -4,10 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const TABS = [
-  { href: "/add", label: "Add", icon: CameraIcon },
-  { href: "/collection", label: "Collection", icon: GridIcon },
-  { href: "/value", label: "Value", icon: ChartIcon },
+  { href: "/add", label: "Add", icon: CameraIcon, also: [] as string[] },
+  { href: "/collection", label: "Collection", icon: GridIcon, also: ["/items"] },
+  { href: "/value", label: "Value", icon: ChartIcon, also: [] as string[] },
 ];
+
+const isActive = (pathname: string, t: (typeof TABS)[number]) =>
+  [t.href, ...t.also].some((p) => pathname === p || pathname.startsWith(p + "/"));
 
 export function NavBar({ variant }: { variant: "top" | "bottom" }) {
   const pathname = usePathname();
@@ -16,7 +19,7 @@ export function NavBar({ variant }: { variant: "top" | "bottom" }) {
     return (
       <nav aria-label="Main" className="flex gap-1">
         {TABS.map((t) => {
-          const active = pathname.startsWith(t.href);
+          const active = isActive(pathname, t);
           return (
             <Link
               key={t.href}
@@ -37,7 +40,7 @@ export function NavBar({ variant }: { variant: "top" | "bottom" }) {
   return (
     <nav aria-label="Main" className="grid grid-cols-3">
       {TABS.map((t) => {
-        const active = pathname.startsWith(t.href);
+        const active = isActive(pathname, t);
         const Icon = t.icon;
         return (
           <Link

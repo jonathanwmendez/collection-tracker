@@ -57,17 +57,41 @@ export async function getGoogleAccessToken(userId: string): Promise<string> {
   return json.access_token;
 }
 
-async function driveFetch(token: string, url: string, init: RequestInit): Promise<Response> {
+/** Calls a Google API with the user's token and turns failures into plain-language errors. */
+export async function googleFetch(token: string, url: string, init: RequestInit = {}, what = "Google"): Promise<Response> {
   const res = await fetch(url, { ...init, headers: { ...(init.headers ?? {}), authorization: `Bearer ${token}` } });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    console.error("Google Drive error", res.status, body.slice(0, 300));
-    if (res.status === 401 || res.status === 403) {
-      throw new GoogleError("Google Drive refused the request. Sign out and sign in again, and allow Drive access.", 401, true);
+    console.error(`${what} error`, res.status, body.slice(0, 300));
+    if (res.status === 401) {
+      throw new GoogleError("Your Google connection expired. Sign out and sign in again.", 401, true);
     }
-    throw new GoogleError("Google Drive didn't save the photo. Try again.", 502);
+    if (res.status === 403) {
+      if (/has not been used|is disabled|SERVICE_DISABLED/i.test(body)) {
+        throw new GoogleError(`The ${what} API isn't turned on in your Google Cloud project yet.`, 503);
+      }
+      if (/insufficient|scope/i.test(body)) {
+        throw new GoogleError(`The app doesn't have permission to use ${what} yet. Sign out, sign in again, and allow access.`, 403, true);
+      }
+      throw new GoogleError(`${what} refused the request. Check that your Google account can open this file.`, 403);
+    }
+    if (res.status === 404) throw new GoogleError(`${what} couldn't find that file. Check the link in Settings.`, 404);
+    if (res.status === 429) throw new GoogleError(`${what} is rate limiting requests. Try again in a minute.`, 429);
+    throw new GoogleError(`${what} didn't respond properly. Try again.`, 502);
   }
   return res;
+}
+
+const driveFetch = (token: string, url: string, init: RequestInit) => googleFetch(token, url, init, "Google Drive");
+
+/** Downloads a Drive file the app can read (photos linked in the sheet). */
+export async function downloadDriveFile(token: string, fileId: string): Promise<ArrayBuffer> {
+  const res = await driveFetch(
+    token,
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`,
+    {},
+  );
+  return res.arrayBuffer();
 }
 
 async function createFolder(token: string, name: string, parentId?: string): Promise<string> {

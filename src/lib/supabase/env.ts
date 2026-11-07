@@ -16,5 +16,14 @@ export function isAllowedEmail(email: string | null | undefined): boolean {
   return allowed.includes(email.toLowerCase());
 }
 
-/** Google access requested at sign-in: only the files this app creates or that you pick. */
-export const GOOGLE_SCOPES = "https://www.googleapis.com/auth/drive.file";
+/**
+ * Google access requested at sign-in:
+ * - spreadsheets: read and update the Collection Tracker sheet
+ * - drive.readonly: show the photos Collection Intake saved to Drive
+ * - drive.file: save new photos the app uploads itself
+ */
+export const GOOGLE_SCOPES = [
+  "https://www.googleapis.com/auth/spreadsheets",
+  "https://www.googleapis.com/auth/drive.readonly",
+  "https://www.googleapis.com/auth/drive.file",
+].join(" ");

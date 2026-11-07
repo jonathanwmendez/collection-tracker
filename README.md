@@ -1,37 +1,61 @@
 # Collection Tracker
 
-A phone-first web app for cataloging collectibles. Take a photo, Claude identifies the item, the app finds a verified market price from real sales, and you approve it into your collection. Photos are saved to Google Drive, and the collection stays in sync with a Google Sheet.
+A phone-first web app for cataloging collectibles: sports cards, Magic: The Gathering, Yu-Gi-Oh!, Pokémon, figures, magazines, newspapers, ornaments, and more. It browses, searches, edits, and values a collection kept in a Google Sheet, with photos in Google Drive.
 
-Categories: Sports Cards, Magic: The Gathering, Yu-Gi-Oh!, Pokémon, Figures, Magazines, Newspapers, Ornaments, and Other.
+## How it works
+
+The Google Sheet is the main copy of the collection. Three pieces work on it:
+
+| Piece | Runs on | What it does |
+|---|---|---|
+| **Collection Intake** | A Claude artifact, on the owner's Claude plan | Take a photo, Claude identifies the item and estimates a price, you approve, and it saves the photo to Drive and the row to the sheet |
+| **Scheduled price check** | A Claude scheduled task, every 4 hours | Prices every row with an empty Last Checked from recent sold listings, and notes the source |
+| **This web app** | Vercel + Supabase | Syncs from the sheet, then browses, searches, edits, deletes, values, and charts the collection |
+
+Identification and sales research run inside Claude, so they use the Claude subscription rather than paid API calls. The web app itself makes no Claude calls.
+
+### Features
+
+- **Sync** from the sheet when the app opens and whenever you return to it, or with **Sync now**
+- **Collection**: categories with counts and values, search across everything, per-category lists with status filters and sorting
+- **Item pages**: photos (previews made once from Drive and cached), value and price history, details, notes, links to eBay sold listings or TCGplayer and to the item's row in the sheet
+- **Editing** that writes to the sheet first. Each write checks the row still holds the same item, so a sorted or edited sheet can't cause the wrong row to be overwritten
+- **Delete** an item's row, or **Ask Claude to reprice** it (clears Last Checked so the scheduled check picks it up)
+- **Free card prices** for Magic (Scryfall), Pokémon (Pokémon TCG API), and Yu-Gi-Oh! (YGOPRODeck), one card or a whole category at a time, saved to the sheet with the source
+- **Value**: total, share verified against real sales, value over time (one snapshot per day), by category, by status, most valuable items, and items due for repricing
+- **Add without a photo**: a form that appends a row to the right tab
+- Light and dark mode, installable on a phone home screen
 
 ## How it's built
 
-| Part | Tool | Why |
-|---|---|---|
-| App | Next.js 15, TypeScript, Tailwind CSS | One codebase for screens and server code |
-| Hosting | Vercel | Free for personal projects |
-| Database and sign-in | Supabase (Postgres, Auth, Storage) | Real SQL database, Google sign-in, photo previews |
-| Full-size photos | Google Drive | 15 GB free, browsable in Drive |
-| Spreadsheet view | Google Sheets | The collection stays readable and shareable as a sheet |
-| Identification and prices | Claude API, Scryfall, Pokémon TCG API, YGOPRODeck | Photo identification and verified pricing |
+| Part | Tool |
+|---|---|
+| App | Next.js 15 (App Router), TypeScript, Tailwind CSS 4 |
+| Hosting | Vercel |
+| Database, sign-in, preview images | Supabase (Postgres with row-level security, Auth, Storage) |
+| Main copy of the collection | Google Sheets API |
+| Full-size photos | Google Drive API |
+| Card prices | Scryfall, Pokémon TCG API, YGOPRODeck |
 
 ### Data model
 
-- `items`: one row per item, with category-specific fields in `details` (JSON keyed by the sheet's column names)
-- `photos`: Drive file plus a small preview in Supabase Storage
-- `price_checks`: every price check ever run, so value can be charted over time
-- `settings`: which sheet and Drive folders to use
-- `google_tokens`: server-only Google refresh tokens for background work
+- `items`: one row per sheet row, with category-specific fields in `details` (JSON keyed by the sheet's column names)
+- `photos`: the Drive file linked in the sheet, plus a small cached preview in Supabase Storage
+- `price_checks`: every value change seen during sync or saved by the app, for price history
+- `value_snapshots`: the collection's total value once per day, for the chart
+- `settings`: the sheet, its tab IDs, the Collection Intake link, and the repricing window
+- `google_tokens`: server-only Google refresh tokens
 
-See [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql).
+Migrations: [`0001_init.sql`](supabase/migrations/0001_init.sql), [`0002_sheet_sync.sql`](supabase/migrations/0002_sheet_sync.sql).
 
-## Build plan
+### Code map
 
-- [x] **Step 1: Foundation.** Project setup, theme, Google sign-in locked to allowed accounts, app layout, database schema
-- [ ] **Step 2: Add items.** Photos, Claude identification, review card, saving to Drive, Supabase, and the sheet
-- [ ] **Step 3: Prices.** Verified prices on the review card, card game price databases
-- [ ] **Step 4: Collection.** Browse, search, photo gallery, editing
-- [ ] **Step 5: Value and upkeep.** Totals, charts over time, scheduled repricing, sheet sync
+- `src/lib/sheet-format.ts`: reading and writing sheet rows (columns found by header name, so columns can move)
+- `src/lib/sync.ts`: sheet to database sync, price history, daily snapshots
+- `src/lib/prices.ts`: free card price lookups
+- `src/lib/item-sheet.ts`: safe row writes (checks the row before writing)
+- `src/app/api/*`: sync, item edit/delete/reprice/price, settings, photo previews
+- `tests/`: unit tests for row parsing, price lookups, and collection math (`npm test`)
 
 ## Setup
 
@@ -42,28 +66,34 @@ Do the parts in this order: each one needs an address from the one before it.
 ### 1. Supabase
 
 1. Create a free project at [supabase.com](https://supabase.com). Under **Security**, keep **Enable Data API** on, turn **Automatically expose new tables** off, and turn **Enable automatic RLS** on.
-2. Open **SQL Editor**, paste the contents of `supabase/migrations/0001_init.sql`, and run it.
+2. Open **SQL Editor** and run `supabase/migrations/0001_init.sql`, then `supabase/migrations/0002_sheet_sync.sql`.
 3. Open **Settings > API Keys**. Copy the project URL, a **publishable** key, and a **secret** key. If the page has no publishable or secret key yet, create them there.
 
 ### 2. Vercel
 
-1. Sign up at [vercel.com](https://vercel.com) with GitHub, then **Add New > Project** and import this repository. If it isn't listed, use **Adjust GitHub App Permissions** to give Vercel access to it.
-2. Before deploying, open **Environment Variables** and add the four variables from the table below.
-3. Deploy, then note the production address (for example `https://collection-tracker-xxxx.vercel.app`). The sign-in button won't work until parts 3 and 4 are done.
+1. Sign up at [vercel.com](https://vercel.com) with GitHub, then **Add New > Project** and import this repository.
+2. Before deploying, open **Environment Variables** and add the variables from the table below.
+3. Deploy, then note the production address (for example `https://collection-tracker-xxxx.vercel.app`).
 
-### 3. Google sign-in
+### 3. Google
 
 1. In [Google Cloud Console](https://console.cloud.google.com), create a project.
 2. Enable the **Google Drive API** and the **Google Sheets API** (search each name in the top bar, then **Enable**).
 3. Open **Google Auth Platform** and click **Get started**: app name, support email, audience **External**, contact email, then **Create**.
 4. **Audience > Test users:** add the Google account you'll sign in with. Leave the status on **Testing** (see the note below).
-5. **Data access > Add or remove scopes:** add `openid` and `.../auth/drive.file`, then **Save**.
+5. **Data access > Add or remove scopes:** under **Manually add scopes**, paste these, click **Add to table**, then **Update** and **Save**:
+   ```
+   openid
+   https://www.googleapis.com/auth/spreadsheets
+   https://www.googleapis.com/auth/drive.readonly
+   https://www.googleapis.com/auth/drive.file
+   ```
 6. **Clients > Create client:** type **Web application**.
    - **Authorized JavaScript origins:** your Vercel address (no trailing slash), plus `http://localhost:3000` for local development.
    - **Authorized redirect URIs:** the callback URL from Supabase's Google provider page (step 4.1), which looks like `https://<project-ref>.supabase.co/auth/v1/callback`.
-   - Create it and copy the client ID and client secret.
+   - Create it and copy the client ID and client secret. Google may only show the secret once. If you lose it, open the client and use **Add secret**; older secrets keep working.
 
-**Testing vs. production.** In Testing, only listed test users can sign in, and Google ends their access 7 days after each sign-in, so you sign in again about once a week. Moving to **In production** removes that limit, but Google requires a home page, privacy policy, and terms of service on a domain you own and have verified, listed under **Branding**. That's a later step.
+**Testing vs. production.** In Testing, only listed test users can sign in, Google shows a "Google hasn't verified this app" screen (choose **Continue**), and Google ends access 7 days after each sign-in, so you sign in again about once a week. Publishing to production needs a home page, privacy policy, and terms on a verified domain, plus Google's review for the `spreadsheets` (sensitive) and `drive.readonly` (restricted) scopes.
 
 ### 4. Connect Google to Supabase
 
@@ -72,7 +102,12 @@ Do the parts in this order: each one needs an address from the one before it.
    - **Site URL:** your Vercel address.
    - **Redirect URLs:** `https://<your-vercel-address>/auth/callback` and `http://localhost:3000/**`.
 
-Then open your Vercel address and sign in.
+### 5. Connect the sheet
+
+1. Open your Vercel address and sign in. Allow all the Google permissions on the consent screen.
+2. Open **Settings** (your initials, top right). Paste the Google Sheet's link and the Collection Intake artifact's link, then **Save**. The first sync starts on its own.
+
+The sheet needs one tab per category (Sports Cards, Magic: The Gathering, Yu-Gi-Oh!, Pokémon, Figures, Magazines, Newspapers, Ornaments, Other), with headers in row 1: the category's fields, then `Condition`, `Qty`, `Market Value (Each)`, `Last Checked`, `Status`, `Photo`, `Notes`. Columns whose header ends in `(Auto)` are formulas and are never written.
 
 ### Environment variables
 
@@ -84,12 +119,19 @@ Set these in Vercel, and in `.env.local` (copied from `.env.example`) for local 
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase publishable key |
 | `SUPABASE_SECRET_KEY` | Supabase secret key (server only) |
 | `ALLOWED_EMAILS` | Google accounts allowed to sign in, comma-separated |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID (step 3.6) |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret (step 3.6, server only) |
+| `POKEMONTCG_API_KEY` | Optional. Raises the Pokémon TCG API's rate limit. Free at [pokemontcg.io](https://pokemontcg.io) |
+| `ANTHROPIC_API_KEY` | Optional and unused by default. Only for the in-app identification routes (`/api/identify`), billed to a Claude Console account |
+
+After changing variables in Vercel, redeploy for them to take effect.
 
 ### Run locally
 
 ```bash
 npm install
 npm run dev
+npm test
 ```
 
 Open http://localhost:3000.
@@ -99,4 +141,5 @@ Open http://localhost:3000.
 - Only the Google accounts listed in `ALLOWED_EMAILS` can sign in.
 - Every table uses row-level security, so each account sees only its own rows.
 - Google refresh tokens are stored in a table only the server can read.
-- The app asks Google only for `drive.file` access: the files it creates and the sheet you pick, not the rest of your Drive.
+- Google access: `spreadsheets` to read and update the collection sheet, `drive.readonly` to show photos Collection Intake saved to Drive, and `drive.file` for files the app creates. The app never deletes Drive files.
+- Every sheet write first re-reads the row and checks the item's name, so a sorted or edited sheet can't cause the wrong row to be overwritten.
