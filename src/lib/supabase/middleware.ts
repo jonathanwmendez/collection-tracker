@@ -4,8 +4,9 @@ import { canAdmin, roleOf } from "../access";
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL, supabaseConfigured } from "./env";
 
 const PUBLIC_PATHS = ["/login", "/auth"];
-// Open to anyone, signed in or not: share links (checked by their token) and access requests.
-const OPEN_PATHS = ["/s", "/api/share", "/api/access-requests"];
+// Open to anyone, signed in or not: share links (checked by their token), access requests, the demo,
+// and the daily sync (checked by CRON_SECRET).
+const OPEN_PATHS = ["/s", "/api/share", "/api/access-requests", "/demo", "/api/cron"];
 
 /** Refreshes the session cookie on every request and keeps out anyone who isn't signed in and allowed. */
 export async function updateSession(request: NextRequest) {
