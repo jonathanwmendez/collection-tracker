@@ -108,6 +108,12 @@ create policy "own price checks" on price_checks for all to authenticated
 create policy "own settings" on settings for all to authenticated
   using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
 
+-- Table access for the Data API. New tables aren't exposed automatically, so each grant is explicit.
+-- Signed-in users reach their own rows through RLS. Signed-out visitors get nothing.
+-- google_tokens is granted to the server role only.
+grant select, insert, update, delete on items, photos, price_checks, settings to authenticated;
+grant all on items, photos, price_checks, settings, google_tokens to service_role;
+
 -- Totals by category, for the Value tab and the sheet's Summary.
 create view category_totals with (security_invoker = true) as
 select
@@ -119,6 +125,8 @@ select
   count(*) filter (where value_status = 'estimate') as unverified
 from items
 group by user_id, category;
+
+grant select on category_totals to authenticated, service_role;
 
 -- Private bucket for photo previews. Files are stored under "<user id>/...".
 insert into storage.buckets (id, name, public) values ('previews', 'previews', false)
