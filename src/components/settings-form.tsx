@@ -69,7 +69,7 @@ export function SettingsForm({
       <label className="flex flex-col gap-1 text-sm font-medium">
         Collection Intake link
         <input className={input} value={intake} onChange={(e) => setIntake(e.target.value)} placeholder="https://claude.ai/artifact/…" inputMode="url" />
-        <span className="text-xs font-normal text-muted">The Add tab opens this page in Claude, so identifying items uses your Claude plan.</span>
+        <span className="text-xs font-normal text-muted">The Add tab opens this page in Claude. Identifying items uses your Claude plan.</span>
       </label>
       <label className="flex flex-col gap-1 text-sm font-medium">
         Reprice after (days)

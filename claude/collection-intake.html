@@ -2,9 +2,10 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
 <style>
-/* Layout: one phone-first column. Colors mirror the Collection Tracker sheet: navy = you fill in, clay = Claude fills in, gray = automatic. */
+
+/* One phone-first column. Colors match the Collection Tracker web app. */
 :root{
   --bg:#F3F5F8; --surface:#FFFFFF; --ink:#16202E; --muted:#5B6575; --line:#DCE1E8;
   --primary:#1F3864; --primary-ink:#FFFFFF; --primary-soft:#E4EAF5; --link:#1F3864;
@@ -26,208 +27,77 @@
   --ok:#6CC28F; --ok-soft:#17301F; --warn:#E2B54D; --warn-soft:#33290F; --bad:#F28B82; --bad-soft:#3A1A18;
   color-scheme:dark;}
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.5}
-.wrap{max-width:660px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:20px}
-header{display:flex;flex-direction:column;gap:6px}
-h1{font-size:24px;font-weight:700;margin:0;letter-spacing:-.01em;text-wrap:balance}
-h2{font-size:13px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0}
-.links{display:flex;flex-wrap:wrap;gap:14px;font-size:14px}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.5;margin:0}
+.wrap{max-width:560px;margin:0 auto;padding-block:24px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:20px}
+h1{font-size:24px;font-weight:700;margin:0;letter-spacing:-.01em}
+.intro{margin:4px 0 0;color:var(--muted);font-size:14px}
 a{color:var(--link);text-underline-offset:2px}
-.intro{margin:0;color:var(--muted);font-size:14px;max-width:60ch}
-.how{list-style:none;margin:0;padding:12px 14px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;counter-reset:how;background:var(--surface);border:1px solid var(--line);border-radius:12px}
-@media (max-width:520px){.how{grid-template-columns:minmax(0,1fr);gap:8px}}
-.how li{counter-increment:how;font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:1px;line-height:1.4}
-.how li b{color:var(--ink);font-weight:500;font-size:14px}
-.how li b::before{content:counter(how) ". ";color:var(--muted)}
-.drop{border:1.5px dashed var(--line);border-radius:14px;background:var(--surface);padding:18px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
-.drop.over{border-color:var(--primary);background:var(--primary-soft)}
-.drop p{margin:0;color:var(--muted);font-size:13px;max-width:48ch}
-.drop fieldset{border:0;margin:0;padding:0;width:100%;min-width:0}
-.drop legend{font-size:13px;font-weight:500;color:var(--muted);margin-bottom:8px;padding:0}
-.modes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;width:100%}
-@media (max-width:560px){.modes{grid-template-columns:minmax(0,1fr)}}
-.mode:has(input:disabled){opacity:.6;cursor:default}
-.pick{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
-.shoot{position:fixed;left:0;right:0;bottom:0;z-index:5;background:var(--surface);border-top:1px solid var(--line);box-shadow:0 -6px 20px rgba(0,0,0,.12);padding:12px max(16px,env(safe-area-inset-left,0px)) max(12px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-right,0px))}
-.shoot[hidden]{display:none}
-.shoot .in{max-width:660px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
-.shoot .top{display:flex;gap:12px;align-items:center}
-.shoot .top img{width:44px;height:44px;object-fit:cover;border-radius:6px;border:1px solid var(--line)}
-.shoot .top b{display:block;font-weight:500}
-.shoot .top small{color:var(--muted);font-size:13px}
-.shoot .acts{display:flex;gap:8px}
-.shoot .acts .primary{flex:1}
-body.shooting .wrap{padding-bottom:170px}
-.thumb figcaption{font-size:11px;color:var(--muted);font-weight:500}
-.sum{display:flex;flex-direction:column;gap:2px;min-width:0}
-.sum b{font-size:16px;font-weight:500;overflow-wrap:anywhere}
-.sum small{color:var(--muted);font-size:13px;overflow-wrap:anywhere}
-.estline{font-size:14px;color:var(--clay-ink)}
-.estline span{font-family:var(--mono);font-weight:500}
-.mode{flex-direction:row;align-items:flex-start;gap:10px;text-align:left;border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;color:var(--muted);font-weight:400;font-size:13px}
-.mode input{width:18px;height:18px;min-width:18px;margin:2px 0 0;padding:0;accent-color:var(--primary)}
-.mode b{display:block;color:var(--ink);font-weight:500;font-size:14px}
-.mode:has(input:checked){border-color:var(--primary);background:var(--primary-soft)}
-.sub{margin:-4px 0 0;color:var(--muted);font-size:13px}
-.lead{margin:0;font-size:14px;color:var(--ink);font-weight:500}
-button,.btn{font:inherit;font-weight:500;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:10px 16px;min-height:44px;cursor:pointer}
-button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+button{font:inherit;font-weight:500;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:10px 16px;min-height:44px;cursor:pointer}
+button:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
 button:disabled{opacity:.55;cursor:default}
 .primary{background:var(--primary);color:var(--primary-ink);border-color:var(--primary)}
-.ghost{background:transparent;border-color:transparent;color:var(--muted)}
-.big{font-size:16px;padding:12px 22px}
+.ghost{background:transparent;border-color:transparent;color:var(--link);text-decoration:underline;text-underline-offset:2px;font-weight:400}
+.hero{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;padding:28px 18px;background:var(--surface);border:1px solid var(--line);border-radius:16px}
+.hero .primary{font-size:18px;min-height:56px;padding:14px 28px;width:min(100%,320px)}
+.hero p{margin:0;color:var(--muted);font-size:13px;max-width:40ch}
 .banner{border-radius:10px;padding:10px 14px;font-size:14px;background:var(--warn-soft);color:var(--warn)}
-.banner[data-kind="bad"]{background:var(--bad-soft);color:var(--bad)}
-.queue{display:flex;flex-direction:column;gap:14px}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0}
-.thumbs{display:flex;gap:8px;flex-wrap:wrap}
-.thumbs img{width:76px;height:76px;object-fit:cover;border-radius:8px;border:1px solid var(--line);max-width:100%;transition:transform .15s ease}
-@media (prefers-reduced-motion: reduce){.thumbs img{transition:none}}
-.thumb{margin:0;display:flex;flex-direction:column;align-items:center;gap:6px}
-.rot{min-height:32px;padding:4px 10px;font-size:12px}
-.state{font-size:14px;color:var(--muted);display:flex;align-items:center;gap:8px}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--clay);animation:pulse 1.2s ease-in-out infinite}
-@keyframes pulse{50%{opacity:.25}}
-@media (prefers-reduced-motion: reduce){.dot{animation:none}}
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
-@media (max-width:480px){.grid{grid-template-columns:minmax(0,1fr)}}
-.full{grid-column:1/-1}
-label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:500;color:var(--muted);min-width:0}
-input,select,textarea{font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;min-width:0}
-textarea{min-height:64px;resize:vertical}
-.clay input{background:var(--clay-soft);border-color:var(--clay);color:var(--clay-ink);font-family:var(--mono);font-weight:500}
-.clay span.k{color:var(--clay-ink)}
-.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.pill{font-size:12px;font-weight:500;border-radius:999px;padding:3px 10px;background:var(--primary-soft);color:var(--ink)}
-.pill.high{background:var(--ok-soft);color:var(--ok)}
-.pill.medium{background:var(--warn-soft);color:var(--warn)}
-.pill.low{background:var(--bad-soft);color:var(--bad)}
-.note{font-size:13px;border-radius:8px;padding:8px 10px;background:var(--warn-soft);color:var(--warn)}
-.note.info{background:var(--primary-soft);color:var(--ink)}
-.est{font-size:12px;color:var(--muted)}
-.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:14px}
-.steps li{display:flex;gap:8px;align-items:baseline}
-.steps li::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:var(--line);transform:translateY(-1px)}
-.steps li.done::before{background:var(--ok)}
-.steps li.doing::before{background:var(--clay)}
-.steps li.fail::before{background:var(--bad)}
-.err{font-size:14px;color:var(--bad)}
-.recent{display:flex;flex-direction:column;gap:0;background:var(--surface);border:1px solid var(--line);border-radius:14px}
-.ritem{display:flex;gap:12px;justify-content:space-between;align-items:center;padding:12px 14px;border-top:1px solid var(--line);flex-wrap:wrap}
-.ritem:first-child{border-top:0}
-.ritem .t{min-width:0;flex:1 1 220px}
-.ritem .t b{font-weight:500;display:block;overflow-wrap:anywhere}
-.ritem .t small{color:var(--muted)}
-.price{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:14px}
-.price.pending{color:var(--clay-ink)}
-.price.ok{color:var(--ok)}
-.empty{padding:16px 14px;color:var(--muted);font-size:14px}
+.banner[data-kind="ok"]{background:var(--ok-soft);color:var(--ok)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:8px}
+.ph{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--primary-soft)}
+.ph img{width:100%;height:100%;object-fit:cover;display:block}
+.ph span{position:absolute;left:4px;bottom:4px;font-size:11px;font-weight:500;border-radius:999px;padding:1px 7px;background:rgba(0,0,0,.6);color:#fff}
+.ph.up span{background:var(--clay)}
+.ph.fail{outline:2px solid var(--bad)}
+.ph.fail span{background:var(--bad)}
+.ph button{position:absolute;inset:0;width:100%;height:100%;opacity:0;min-height:0}
+.err{font-size:14px;color:var(--bad);margin:0}
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:5;background:var(--surface);border-top:1px solid var(--line);box-shadow:0 -6px 20px rgba(0,0,0,.12);padding:12px max(16px,env(safe-area-inset-left,0px)) max(12px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-right,0px))}
+.bar[hidden]{display:none}
+.bar .in{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:8px}
+.bar .count{font-size:14px;color:var(--muted)}
+.bar .count b{color:var(--ink);font-weight:500}
+.bar .acts{display:flex;gap:8px}
+.bar .acts .primary{flex:1;font-size:16px;min-height:52px}
+body.shooting .wrap{padding-bottom:150px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 </style>
 
 <div class="wrap">
   <header>
     <h1>Collection Intake</h1>
-    <p class="intro">Add items to your Collection Tracker sheet from photos.</p>
-    <div class="links">
-      <a href="https://docs.google.com/spreadsheets/d/{{SHEET_ID}}/edit" target="_blank" rel="noopener">Open the sheet</a>
-      <a href="https://drive.google.com/drive/folders/{{PHOTOS_FOLDER_ID}}" target="_blank" rel="noopener">Open photo folders</a>
-    </div>
+    <p class="intro">Take photos. Claude identifies each item, pairs card fronts with backs, saves them to your sheet, and prices them. <a href="https://docs.google.com/spreadsheets/d/{{SHEET_ID}}/edit" target="_blank" rel="noopener">Open the sheet</a></p>
   </header>
-
-  <ol class="how" aria-label="How it works">
-    <li><b>Take photos</b>As many as you like. Claude identifies each one while you keep going.</li>
-    <li><b>Check and approve</b>Most items need a quick look. Approve one at a time or all at once.</li>
-    <li><b>Saved and priced</b>The item goes in your sheet, then gets a verified price from real sales.</li>
-  </ol>
 
   <div id="banners"></div>
 
-  <section class="drop" id="drop" aria-label="Add photos">
-    <fieldset>
-      <legend>What are you adding?</legend>
-      <div class="modes">
-        <label class="mode"><input type="radio" name="mode" value="cards" checked><span><b>Cards, front and back</b>Take the front, then the back. Each pair becomes one card.</span></label>
-        <label class="mode"><input type="radio" name="mode" value="one"><span><b>One item per photo</b>Figures, magazines, and anything else.</span></label>
-        <label class="mode"><input type="radio" name="mode" value="multi"><span><b>Several cards per photo</b>A binder page or cards laid out, up to 9. Fronts only.</span></label>
-      </div>
-    </fieldset>
-    <div class="pick">
-      <button class="primary big" id="shootBtn" type="button">Take photos</button>
-      <button class="big" id="pick" type="button">Choose from library</button>
-    </div>
-    <p id="modeHint"></p>
-    <input id="file" class="sr" type="file" accept="image/*" multiple>
+  <section class="hero" aria-label="Add photos">
+    <button class="primary" id="shoot" type="button">Take photos</button>
+    <button class="ghost" id="pick" type="button">Choose from library</button>
+    <p>For a card, take the front, then the back. A binder page or several items in one photo works too.</p>
     <input id="cam" class="sr" type="file" accept="image/*" capture="environment">
+    <input id="file" class="sr" type="file" accept="image/*" multiple>
   </section>
 
-  <section id="reviewBox" style="display:none;flex-direction:column;gap:10px">
-    <div class="row" style="justify-content:space-between">
-      <h2 id="reviewHead">To review</h2>
-      <button class="primary" id="approveAll" type="button" hidden>Approve all</button>
-    </div>
-    <div class="queue" id="queue" aria-live="polite"></div>
-  </section>
-
-  <section style="display:flex;flex-direction:column;gap:10px">
-    <div class="row" style="justify-content:space-between">
-      <h2>Recently added</h2>
-      <button id="refreshAll" type="button">Update prices</button>
-    </div>
-    <p class="sub">Verified prices usually arrive a few minutes after you approve. Tap Update prices to load them from the sheet.</p>
-    <div class="recent" id="recent"><div class="empty">Nothing added yet. Items you approve on this device show up here.</div></div>
+  <section id="sent" hidden aria-live="polite" style="display:flex;flex-direction:column;gap:10px">
+    <div class="grid" id="grid"></div>
+    <p class="err" id="err" hidden></p>
   </section>
 </div>
 
-<div class="shoot" id="shoot" hidden role="region" aria-label="Taking photos">
+<div class="bar" id="bar" hidden role="region" aria-label="Photos">
   <div class="in">
-    <div class="top"><img id="shootThumb" alt="" hidden><div><b id="shootTitle"></b><small id="shootSub"></small></div></div>
+    <div class="count" id="count"></div>
     <div class="acts">
-      <button class="primary big" id="shootNext" type="button">Take photo</button>
-      <button id="shootSkip" type="button" hidden>No back</button>
-      <button id="shootDone" type="button">Done</button>
+      <button class="primary" id="more" type="button">Take another</button>
+      <button id="done" type="button">Done</button>
     </div>
   </div>
 </div>
 
 <script>
 (() => {
-const SHEET = "{{SHEET_ID}}";
+const INBOX = "{{INBOX_FOLDER_ID}}";
 const TRIGGER = "{{PRICE_CHECK_TASK_ID}}";
-const CARD_COND = ["NM","LP","MP","HP","DMG"];
-const PAPER_COND = ["Mint","Near Mint","Very Good","Good","Fair","Poor"];
-const TAIL = ["@mv","@auto","@lc","@auto","@status","@photo","@notes","@paid"];
-// Card tabs go on: Sold For, Sold Date, PSA 9, PSA 10 (never written here), then Back Photo.
-const CARD_TAIL = [...TAIL, "@sold","@solddate","@psa9","@psa10","@back"];
-const TABS = {
-  "Sports Cards": {folder:"{{FOLDER_SPORTS_CARDS}}", cond:["Raw","Graded"],
-    cols:["Player","Year","Brand / Set","Card #","Parallel / Variant","@cond","Grade","@qty",...CARD_TAIL]},
-  "Magic: The Gathering": {folder:"{{FOLDER_MAGIC}}", cond:CARD_COND,
-    cols:["Card Name","Set","Collector #","Finish","@cond","@qty",...CARD_TAIL], opts:{"Finish":["Non-foil","Foil","Etched"]}},
-  "Yu-Gi-Oh!": {folder:"{{FOLDER_YUGIOH}}", cond:CARD_COND,
-    cols:["Card Name","Set","Set Code","Rarity","Edition","@cond","@qty",...CARD_TAIL], opts:{"Edition":["1st Edition","Unlimited","Limited Edition"]}},
-  "Pokémon": {folder:"{{FOLDER_POKEMON}}", cond:CARD_COND,
-    cols:["Card Name","Set","Card #","Rarity","Variant","@cond","@qty",...CARD_TAIL], opts:{"Variant":["Non-Holo","Holo","Reverse Holo","1st Edition","Shadowless"]}},
-  "Figures": {folder:"{{FOLDER_FIGURES}}", cond:["In Box","Loose","Opened"],
-    cols:["Name","Line / Brand","Year","@cond","@qty",...TAIL]},
-  "Magazines": {folder:"{{FOLDER_MAGAZINES}}", cond:PAPER_COND,
-    cols:["Title","Issue","Date","Cover / Feature","@cond","@qty",...TAIL]},
-  "Newspapers": {folder:"{{FOLDER_NEWSPAPERS}}", cond:PAPER_COND,
-    cols:["Newspaper","Date","Headline","@cond","@qty",...TAIL]},
-  "Ornaments": {folder:"{{FOLDER_ORNAMENTS}}", cond:["In Box","No Box","Damaged Box"],
-    cols:["Name","Brand / Series","Year","@cond","@qty",...TAIL]},
-  "Other": {folder:"{{FOLDER_OTHER}}", cond:["New","Like New","Used","In Box","Loose"],
-    cols:["Item","Type","Year","@cond","@qty",...TAIL]},
-};
-const STATUSES = ["Keep","Sell","Listed","Sold"];
-const L = i => String.fromCharCode(65 + i);
-const fieldsOf = tab => TABS[tab].cols.filter(c => !c.startsWith("@"));
-const isCardTab = tab => TABS[tab]?.cols.includes("@back");
-const colOf = (tab, key) => L(TABS[tab].cols.indexOf(key));
-
-let sample = null, mcp = null, fileArgs = false, imgMax = 4;
-let seq = 0;
-const items = [];
 
 // ---------- tiny DOM helper ----------
 function h(tag, attrs, ...kids){
@@ -245,23 +115,14 @@ function h(tag, attrs, ...kids){
 
 // ---------- banners ----------
 function banner(text, kind){
-  const el = h("div", {class:"banner", "data-kind":kind || ""}, text);
-  document.getElementById("banners").append(el);
+  const box = document.getElementById("banners");
+  box.replaceChildren(h("div", {class:"banner", "data-kind":kind || ""}, text));
 }
 
-// ---------- capabilities ----------
-(async () => {
-  sample = await claude.use("sample");
-  if (!sample) banner("This page can't reach Claude here, so it can't identify items. Open it from claude.ai or the Claude app.", "bad");
-  else {
-    const lim = await sample.limits().catch(() => null);
-    if (!lim?.images) { banner("This view can't send photos to Claude. Open the page in the Claude app or on claude.ai.", "bad"); sample = null; }
-    else imgMax = lim.images.maxCount || 4;
-  }
-})();
+let mcp = null, fileArgs = false;
 (async () => {
   mcp = await claude.use("mcp");
-  if (!mcp) { banner("Google Drive and Sheets aren't reachable from this view, so approved items can't be saved yet. Open the page from claude.ai or the Claude app."); return; }
+  if (!mcp){ banner("Photos can't be uploaded from this view. Open this page in the Claude app or on claude.ai."); return; }
   const lt = await mcp.listTools().catch(() => null);
   fileArgs = !!lt?.fileArgs;
 })();
@@ -270,10 +131,10 @@ function banner(text, kind){
 function mcpWhy(e){
   const s = e?.server || "the connector";
   switch (e?.code){
-    case "needs_reauth": return `Reconnect ${s} in claude.ai Settings → Connectors, then tap Approve again.`;
-    case "server_not_connected": return `Add the ${s} connector in claude.ai Settings → Connectors, then tap Approve again.`;
-    case "selection_required": return `Choose which ${s} account to use when claude.ai asks, then tap Approve again.`;
-    case "approval_required": case "not_in_manifest": return `This page needs your OK to use ${s}. Tap Approve again and allow it.`;
+    case "needs_reauth": return `Reconnect ${s} in claude.ai Settings → Connectors, then try again.`;
+    case "server_not_connected": return `Add the ${s} connector in claude.ai Settings → Connectors, then try again.`;
+    case "selection_required": return `Choose which ${s} account to use when claude.ai asks, then try again.`;
+    case "approval_required": case "not_in_manifest": return `This page needs your OK to use ${s}. Try again and allow it.`;
     case "blocked_by_policy": return `Your organization blocks this ${s} action.`;
     case "server_unavailable": return `${s} isn't responding right now. Wait a minute and try again.`;
     case "tool_error": return `${s} reported a problem: ${String(e.message || "").slice(0, 180)}`;
@@ -281,19 +142,6 @@ function mcpWhy(e){
     default: return `${s} didn't finish (${e?.code || "unknown error"}). Check the sheet before trying again.`;
   }
 }
-function sampleWhy(e){
-  switch (e?.code){
-    case "not_granted": return "Allow this page to use Claude when asked, then tap Identify again.";
-    case "rate_limited": return "Claude is busy or you've hit a usage limit. Try again in a little while.";
-    case "image_rejected": return "That photo couldn't be read. Try a JPEG or PNG under 20 MB.";
-    case "invalid_json": return "Claude's answer came back in the wrong shape. Tap Identify again.";
-    case "refused": return "Claude couldn't identify this photo. Try a clearer shot.";
-    case "session_expired": return "Your Claude session expired. Sign in again.";
-    case "cancelled": return "Stopped.";
-    default: return `Identification failed (${e?.code || "unknown error"}). Tap Identify again.`;
-  }
-}
-
 // ---------- images ----------
 // Applies the camera's rotation tag (so the saved file is upright everywhere), then any extra turn from the Rotate button.
 async function toJpeg(file, maxSide, quality, rot = 0){
@@ -313,555 +161,103 @@ function toBase64(blob){
   return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(",")[1]); fr.onerror = rej; fr.readAsDataURL(blob); });
 }
 
-// ---------- adding photos ----------
-const MODE_KEY = "intake-mode-v1";
-const HINTS = {
-  cards: "Take photos: shoot the front, then the back, for each card. From the library: pick them in order, front, back, front, back.",
-  one: "Each photo becomes one item. You can add more angles to an item after Claude identifies it.",
-  multi: "Each photo becomes several cards. Backs aren't saved in this mode.",
-};
-const radios = [...document.querySelectorAll('input[name="mode"]')];
-let mode = "cards";
-try { const m = localStorage.getItem(MODE_KEY); if (HINTS[m]) mode = m; } catch {}
-radios.forEach(r => { r.checked = r.value === mode; r.onchange = () => { if (r.checked){ mode = r.value; try { localStorage.setItem(MODE_KEY, mode); } catch {} showHint(); } }; });
-function showHint(){ document.getElementById("modeHint").textContent = HINTS[mode]; }
-showHint();
+// ---------- photos ----------
+// Each photo is named with when this session started plus a running number, so the
+// background task sees them in the order they were taken (a card's front, then its back).
+const pad = n => String(n).padStart(3, "0");
+const sessionStamp = (() => { const d = new Date(), z = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())} ${z(d.getHours())}-${z(d.getMinutes())}-${z(d.getSeconds())}`; })();
+let seq = 0, uploaded = 0, unsent = 0, idle = null, doneAsked = false;
+const photos = [];
 
-const fileInput = document.getElementById("file");
-document.getElementById("pick").onclick = () => fileInput.click();
-fileInput.onchange = () => { addFiles(fileInput.files); fileInput.value = ""; };
-const drop = document.getElementById("drop");
-drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("over"); });
-drop.addEventListener("dragleave", () => drop.classList.remove("over"));
-drop.addEventListener("drop", e => { e.preventDefault(); drop.classList.remove("over"); addFiles(e.dataTransfer.files); });
+const cam = document.getElementById("cam"), lib = document.getElementById("file");
+document.getElementById("shoot").onclick = () => cam.click();
+document.getElementById("more").onclick = () => cam.click();
+document.getElementById("pick").onclick = () => lib.click();
+cam.onchange = () => { add([...cam.files]); cam.value = ""; };
+lib.onchange = () => { add([...lib.files].sort((a, b) => a.lastModified - b.lastModified)); lib.value = ""; };
+document.getElementById("done").onclick = () => finish(true);
 
-function newItem(photos, opts = {}){
-  const it = {id: ++seq, photos, rot: photos.map(() => 0), state:"queued", draft:null, error:"", steps:[], multi: !!opts.multi, sides: !!opts.sides};
-  items.push(it); render(it); it.multi ? identifyMany(it) : identify(it);
-  return it;
-}
-
-// Library picks keep the order they were taken in, so fronts and backs pair up.
-function addFiles(list){
-  const files = [...list].filter(f => f.type.startsWith("image/")).sort((a, b) => a.lastModified - b.lastModified);
-  if (!files.length) return;
-  if (mode === "cards") for (let i = 0; i < files.length; i += 2) newItem(files.slice(i, i + 2), {sides:true});
-  else for (const f of files) newItem([f], {multi: mode === "multi"});
-}
-
-// Taking photos: one tap per shot, with a bar that says what to shoot next. Items are identified as you go.
-const cam = document.getElementById("cam");
-let shoot = null; // {mode, pending: front photo waiting for its back, made: items so far}
-document.getElementById("shootBtn").onclick = () => { shoot = {mode, pending:null, made:0}; updateShoot(); cam.click(); };
-document.getElementById("shootNext").onclick = () => cam.click();
-document.getElementById("shootSkip").onclick = () => { if (shoot?.pending){ newItem([shoot.pending], {sides:true}); shoot.pending = null; shoot.made++; updateShoot(); } };
-document.getElementById("shootDone").onclick = () => { if (shoot?.pending){ newItem([shoot.pending], {sides:true}); } shoot = null; updateShoot(); };
-cam.onchange = () => {
-  const f = cam.files[0]; cam.value = "";
-  if (!f || !shoot) return;
-  if (shoot.mode === "cards"){
-    if (!shoot.pending) shoot.pending = f;
-    else { newItem([shoot.pending, f], {sides:true}); shoot.pending = null; shoot.made++; }
-  } else { newItem([f], {multi: shoot.mode === "multi"}); shoot.made++; }
-  updateShoot();
-};
-function updateShoot(){
-  const bar = document.getElementById("shoot"), on = !!shoot;
-  bar.hidden = !on; document.body.classList.toggle("shooting", on);
-  radios.forEach(r => { r.disabled = on; });
-  if (!on) return;
-  const n = shoot.made, plural = (k, w) => `${k} ${w}${k === 1 ? "" : "s"}`;
-  const thumb = document.getElementById("shootThumb"), skip = document.getElementById("shootSkip"), next = document.getElementById("shootNext");
-  let title, sub;
-  if (shoot.mode === "cards"){
-    title = shoot.pending ? `Card ${n + 1}: now the back` : `Card ${n + 1}: the front`;
-    next.textContent = shoot.pending ? "Take the back" : "Take the front";
-    sub = n ? `${plural(n, "card")} so far. Claude is identifying them.` : "Flip each card after its front photo.";
-  } else {
-    title = n ? `${plural(n, "photo")} so far` : "Take your first photo";
-    next.textContent = n ? "Take next photo" : "Take photo";
-    sub = n ? "Claude identifies each one while you keep going." : (shoot.mode === "multi" ? "Lay out up to 9 cards per photo." : "One item per photo.");
+function add(files){
+  for (const f of files){
+    if (!f.type.startsWith("image/")) continue;
+    const p = {file: f, n: ++seq, state: "up", el: null};
+    photos.push(p); draw(p); queue.push(p);
   }
-  document.getElementById("shootTitle").textContent = title;
-  document.getElementById("shootSub").textContent = sub;
-  skip.hidden = !shoot.pending;
-  if (shoot.pending){ thumb.src = (shoot.pending._url ||= URL.createObjectURL(shoot.pending)); thumb.hidden = false; } else thumb.hidden = true;
+  document.getElementById("sent").hidden = false;
+  showBar(); pump();
 }
 
-// ---------- identification ----------
-let running = 0; const waiting = [];
-function slot(){ return new Promise(r => { if (running < 2){ running++; r(); } else waiting.push(r); }); }
-function release(){ const n = waiting.shift(); if (n) n(); else running--; }
-
-function prompt(){
-  const spec = {};
-  for (const [t, c] of Object.entries(TABS)) spec[t] = {fields: fieldsOf(t), conditions: c.cond, ...(c.opts ? {suggested_values: c.opts} : {})};
-  return `You identify collectibles from photos for a collection spreadsheet. The photos show ONE item (several photos are different angles or the front and back of the same item).
-
-Pick the tab that fits best and fill in its fields. Tabs, their fields, and allowed condition values:
-${JSON.stringify(spec)}
-
-Rules:
-- Read every visible identifier: set names, card numbers, set codes, stock numbers, years, brands, grades on slabs.
-- Use "" for any field you can't determine. Never invent a card number or year.
-- Condition must be one of the tab's allowed values. Judge it from what is visible and say in "notes" what you based it on.
-- "estimate" is your best guess of the current market value for ONE unit in USD, based on typical recent sold prices for this exact item and condition. It will be verified against real sales later, so keep it realistic, not optimistic.
-- If none of the tabs fits well, put the item in "Other" and suggest a better category name in "newCategory".
-- Plain wording. No em dashes.
-
-Reply with only this JSON object:
-{"tab": "<tab name exactly>", "fields": {"<field>": "<value>"}, "condition": "<value>", "qty": 1, "estimate": 0, "range": [0, 0], "confidence": "high|medium|low", "notes": "<short: identifiers seen, visible wear>", "uncertain": "<what you could not confirm, or empty>", "newCategory": "<or empty>"}`;
+function draw(p){
+  const label = p.state === "up" ? "Uploading" : p.state === "fail" ? "Tap to retry" : "Sent";
+  const el = h("div", {class: "ph " + (p.state === "up" ? "up" : p.state === "fail" ? "fail" : "")},
+    h("img", {src: (p.file._url ||= URL.createObjectURL(p.file)), alt: `Photo ${p.n}`}), h("span", {}, label),
+    p.state === "fail" ? h("button", {type:"button", "aria-label": `Retry photo ${p.n}`, onclick: () => { p.state = "up"; draw(p); queue.push(p); pump(); }}) : null);
+  if (p.el) p.el.replaceWith(el); else document.getElementById("grid").append(el);
+  p.el = el;
 }
 
-function multiPrompt(){
-  const spec = {};
-  for (const [t, c] of Object.entries(TABS)) spec[t] = {fields: fieldsOf(t), conditions: c.cond, ...(c.opts ? {suggested_values: c.opts} : {})};
-  return `You identify collectibles from a photo for a collection spreadsheet. This photo shows SEVERAL separate items, usually cards in a binder page or laid out in a grid (up to 9).
-
-List every item you can see, reading left to right, top to bottom. For each one, pick the tab that fits best and fill in its fields. Tabs, their fields, and allowed condition values:
-${JSON.stringify(spec)}
-
-Rules:
-- Read every visible identifier: set names, card numbers, set codes, years, brands, grades on slabs.
-- Use "" for any field you can't determine. Never invent a card number or year.
-- Condition must be one of the tab's allowed values. Judge it from what is visible (sleeves can hide wear, so say so in "notes").
-- "estimate" is your best guess of the current market value for ONE unit in USD, based on typical recent sold prices. Keep it realistic.
-- "position" says where the item is, like "top left" or "middle center".
-- Plain wording. No em dashes.
-
-Reply with only this JSON object:
-{"items": [{"position": "<where>", "tab": "<tab name exactly>", "fields": {"<field>": "<value>"}, "condition": "<value>", "qty": 1, "estimate": 0, "range": [0, 0], "confidence": "high|medium|low", "notes": "<short>", "uncertain": "<or empty>"}]}`;
+const queue = []; let active = 0;
+function pump(){
+  while (active < 2 && queue.length){ active++; upload(queue.shift()).finally(() => { active--; pump(); settle(); }); }
 }
 
-function draftFrom(out){
-  const tab = TABS[out?.tab] ? out.tab : "Other";
-  const fields = {};
-  for (const f of fieldsOf(tab)) fields[f] = String(out?.fields?.[f] ?? "");
-  const cond = TABS[tab].cond.includes(out?.condition) ? out.condition : TABS[tab].cond[0];
-  return {
-    tab, fields, cond,
-    qty: Math.max(1, parseInt(out?.qty, 10) || 1),
-    estimate: Number(out?.estimate) > 0 ? Math.round(Number(out.estimate) * 100) / 100 : "",
-    range: Array.isArray(out?.range) ? out.range.map(Number).filter(n => n >= 0) : [],
-    confidence: ["high","medium","low"].includes(out?.confidence) ? out.confidence : "medium",
-    notes: String(out?.notes || ""), uncertain: String(out?.uncertain || ""), newCategory: String(out?.newCategory || ""),
-    status: "Keep", paid: "",
-  };
-}
-
-// Several cards in one photo: one card per item found, all sharing the photo (uploaded to Drive once).
-async function identifyMany(it){
-  it.state = "identifying"; it.error = ""; render(it);
-  if (!sample){ it.state = "idfail"; it.error = "Claude isn't available in this view, so this photo can't be identified here."; render(it); return; }
-  await slot();
+async function upload(p){
+  const err = document.getElementById("err");
+  if (!mcp){ p.state = "fail"; draw(p); err.hidden = false; err.textContent = "Uploading isn't available in this view. Open this page in the Claude app or on claude.ai."; return; }
   try {
-    const img = it.rot[0] ? await toJpeg(it.photos[0], 2400, 0.9, it.rot[0]) : it.photos[0];
-    const out = await sample.json(multiPrompt(), {images: [img], modelTier: "default"});
-    const found = (Array.isArray(out?.items) ? out.items : []).slice(0, 12);
-    if (!found.length){ it.state = "idfail"; it.error = "No items found. Try a straighter, closer photo, or turn off several-cards mode."; return; }
-    const group = {id: it.id, photo: it.photos[0], rot: it.rot[0] || 0, count: found.length};
-    let prev = document.getElementById("item-" + it.id);
-    found.forEach((o) => {
-      const d = draftFrom(o);
-      const where = String(o?.position || "").trim();
-      if (where) d.notes = `(${where} in the photo) ${d.notes}`.trim();
-      const child = {id: ++seq, photos:[it.photos[0]], rot:[it.rot[0] || 0], state:"draft", draft:d, error:"", steps:[], group, label: where};
-      items.push(child);
-      const el = h("article", {class:"card", id:"item-" + child.id, "aria-label":"Item " + child.id}, ...cardBody(child));
-      // Keep reading order (left to right, top to bottom) under the original card.
-      prev ? prev.after(el) : queue.prepend(el);
-      prev = el;
-    });
-    remove(it);
-    updateReviewHead();
-    return;
-  } catch (e){
-    it.state = "idfail"; it.error = sampleWhy(e);
-  } finally { release(); if (items.includes(it)) render(it); }
-}
-
-async function identify(it){
-  if (it.multi) return identifyMany(it);
-  it.state = "identifying"; it.error = ""; render(it);
-  if (!sample){ it.state = "idfail"; it.error = "Claude isn't available in this view, so this item can't be identified here."; render(it); return; }
-  await slot();
-  try {
-    const imgs = await Promise.all(it.photos.slice(0, imgMax).map((f, i) => it.rot[i] ? toJpeg(f, 2000, 0.9, it.rot[i]) : f));
-    const sides = it.sides && imgs.length > 1 ? `\n\nThis is a card: photo 1 is the FRONT and photo 2 is the BACK. Use both (the back often shows the set, number, year, and copyright line).` : "";
-    const out = await sample.json(prompt() + sides, {images: imgs, modelTier: "default"});
-    it.draft = draftFrom(out);
-    it.open = needsLook(it);
-    it.state = "draft";
-  } catch (e){
-    it.state = "idfail"; it.error = sampleWhy(e);
-  } finally { release(); }
-  render(it);
-}
-
-// ---------- rendering ----------
-const queue = document.getElementById("queue");
-function updateReviewHead(){
-  const box = document.getElementById("reviewBox"), n = items.length;
-  box.style.display = n ? "flex" : "none";
-  const waiting = items.filter(x => x.state === "draft" || x.state === "dup").length;
-  const working = items.filter(x => x.state === "queued" || x.state === "identifying").length;
-  document.getElementById("reviewHead").textContent = waiting ? `To review (${waiting})${working ? `, ${working} identifying` : ""}` : (working ? `Identifying ${working}` : "In progress");
-  const ready = items.filter(isReady).length, all = document.getElementById("approveAll");
-  all.hidden = ready < 2 || bulkRunning; all.textContent = `Approve ${ready} ready`;
-}
-// Ready: identified with no flags. Items marked low confidence or "Check this" wait for a manual look.
-const needsLook = it => it.draft.confidence === "low" || !!it.draft.uncertain || !it.draft.fields[fieldsOf(it.draft.tab)[0]];
-const isReady = it => it.state === "draft" && !needsLook(it);
-let bulkRunning = false;
-document.getElementById("approveAll").onclick = async () => {
-  bulkRunning = true; updateReviewHead();
-  for (const it of items.filter(isReady)) if (items.includes(it) && isReady(it)) await approve(it);
-  bulkRunning = false; updateReviewHead();
-};
-function render(it){
-  let card = document.getElementById("item-" + it.id);
-  const fresh = h("article", {class:"card", id:"item-" + it.id, "aria-label":"Item " + it.id}, ...cardBody(it));
-  if (card) card.replaceWith(fresh); else queue.prepend(fresh);
-  updateReviewHead();
-}
-function sideOf(it, i){
-  const card = it.draft ? isCardTab(it.draft.tab) : it.sides;
-  if (!card || it.group) return "";
-  return i === 0 ? "Front" : i === 1 ? "Back" : `Photo ${i + 1}`;
-}
-function thumbs(it, editable){
-  return h("div", {class:"thumbs"}, it.photos.map((f, i) => h("figure", {class:"thumb"},
-    h("img", {src: (f._url ||= URL.createObjectURL(f)), alt: sideOf(it, i) ? `${sideOf(it, i)} of the card` : `Photo ${i + 1} of the item`, style: `transform:rotate(${it.rot[i] || 0}deg)`}),
-    sideOf(it, i) ? h("figcaption", {}, sideOf(it, i)) : null,
-    editable ? h("button", {type:"button", class:"rot", "aria-label": `Rotate photo ${i + 1} clockwise`,
-      onclick: () => { it.rot[i] = ((it.rot[i] || 0) + 90) % 360; render(it); }}, "Rotate") : null)));
-}
-
-function cardBody(it){
-  if (it.state === "queued" || it.state === "identifying")
-    return [thumbs(it), h("div", {class:"state"}, h("i", {class:"dot"}), it.multi ? "Finding each card in the photo. This usually takes 30 to 90 seconds." : "Identifying the item. This usually takes 15 to 60 seconds.")];
-  if (it.state === "idfail")
-    return [thumbs(it), h("div", {class:"err"}, it.error),
-      h("div", {class:"row"}, h("button", {type:"button", onclick: () => identify(it)}, "Identify again"),
-        h("button", {type:"button", class:"ghost", onclick: () => remove(it)}, "Discard"))];
-  if (it.state === "dup")
-    return [thumbs(it), h("b", {}, it.draft.fields[fieldsOf(it.draft.tab)[0]] || "Item"),
-      h("div", {class:"note info"}, `You already have this in ${it.draft.tab}, row ${it.dup.row}${it.dup.cond ? ` (${it.dup.cond})` : ""}, quantity ${it.dup.qty}.`),
-      it.error ? h("div", {class:"err"}, it.error) : null,
-      h("div", {class:"row"},
-        h("button", {type:"button", class:"primary", onclick: () => addToExisting(it)}, `Add ${Math.max(1, parseInt(it.draft.qty, 10) || 1)} to that row`),
-        h("button", {type:"button", onclick: () => { it.dupDecision = "new"; approve(it); }}, "Add as a new row"),
-        h("button", {type:"button", class:"ghost", onclick: () => { it.state = "draft"; render(it); }}, "Back to edit"))];
-  if (it.state === "saving" || it.state === "saved" || it.state === "savefail")
-    return [thumbs(it), h("b", {}, it.draft.fields[fieldsOf(it.draft.tab)[0]] || "Item"),
-      h("ul", {class:"steps"}, it.steps.map(s => h("li", {class:s.state}, s.text))),
-      it.error ? h("div", {class:"err"}, it.error) : null,
-      it.state === "savefail" ? h("div", {class:"row"},
-        h("button", {type:"button", class:"primary", onclick: () => approve(it)}, "Try again"),
-        h("button", {type:"button", class:"ghost", onclick: () => { it.state = "draft"; it.error = ""; render(it); }}, "Back to edit")) : null,
-      it.state === "saved" ? h("div", {class:"row"}, h("span", {class:"est"}, "Done. It's listed under Recently added."), h("button", {type:"button", class:"ghost", onclick: () => remove(it)}, "Dismiss")) : null];
-  return it.open ? draftForm(it) : summary(it);
-}
-
-function addPhotoLabel(it){ return isCardTab(it.draft.tab) && it.photos.length === 1 ? "Add the back" : "Add another angle"; }
-
-function summary(it){
-  const d = it.draft, f = fieldsOf(d.tab);
-  const sub = [d.tab, ...f.slice(1).map(k => d.fields[k]).filter(Boolean), d.cond, Number(d.qty) > 1 ? `Qty ${d.qty}` : ""].filter(Boolean).join(" · ");
-  const noBack = isCardTab(d.tab) && !it.group && it.photos.length < 2;
-  return [
-    thumbs(it, false),
-    it.error ? h("div", {class:"err"}, it.error) : null,
-    h("div", {class:"sum"}, h("b", {}, d.fields[f[0]] || "Unnamed item"), h("small", {}, sub)),
-    h("div", {class:"row"},
-      h("span", {class:"pill " + d.confidence}, `${d.confidence[0].toUpperCase() + d.confidence.slice(1)} confidence`),
-      it.group ? h("span", {class:"pill"}, it.label ? `From a ${it.group.count}-item photo, ${it.label}` : `From a ${it.group.count}-item photo`) : null),
-    h("div", {class:"estline"}, "Claude's estimate: ", h("span", {}, d.estimate !== "" ? `$${Number(d.estimate).toFixed(2)} each` : "none"), " (checked against real sales after you approve)"),
-    noBack ? h("div", {class:"est"}, "No photo of the back. Add it if you have one.") : null,
-    h("div", {class:"row"},
-      h("button", {type:"button", class:"primary", onclick: () => approve(it)}, "Approve and save"),
-      h("button", {type:"button", onclick: () => { it.open = true; render(it); }}, "Edit details"),
-      noBack ? h("button", {type:"button", onclick: () => addMore(it)}, "Add the back") : null,
-      h("button", {type:"button", class:"ghost", onclick: () => remove(it)}, "Discard")),
-  ];
-}
-
-function draftForm(it){
-  const d = it.draft, cfg = TABS[d.tab], pre = `i${it.id}-`;
-  const tabSel = h("select", {id: pre + "tab", onchange: e => switchTab(it, e.target.value)},
-    Object.keys(TABS).map(t => h("option", {value:t, selected: t === d.tab}, t)));
-  const fieldEls = fieldsOf(d.tab).map((f, n) => {
-    const listId = cfg.opts?.[f] ? pre + "dl" + n : null;
-    return h("label", {class: n === 0 ? "full" : ""}, f,
-      h("input", {id: pre + "f" + n, value: d.fields[f] || "", list: listId, autocomplete:"off",
-        oninput: e => { d.fields[f] = e.target.value; }}),
-      listId ? h("datalist", {id:listId}, cfg.opts[f].map(o => h("option", {value:o}))) : null);
-  });
-  const condSel = h("select", {id: pre + "cond", onchange: e => { d.cond = e.target.value; }},
-    cfg.cond.map(c => h("option", {value:c, selected: c === d.cond}, c)));
-  const range = d.range.length === 2 && d.range[1] > 0 ? `Likely range $${d.range[0]} to $${d.range[1]}.` : "";
-  return [
-    thumbs(it, !it.group),
-    h("p", {class:"lead"}, "Check the details, then approve."),
-    it.error ? h("div", {class:"err"}, it.error) : null,
-    h("div", {class:"row"}, h("span", {class:"pill " + d.confidence}, `${d.confidence[0].toUpperCase() + d.confidence.slice(1)} confidence`),
-      it.group ? h("span", {class:"pill"}, it.label ? `From a ${it.group.count}-item photo, ${it.label}` : `From a ${it.group.count}-item photo`) : null),
-    d.uncertain ? h("div", {class:"note"}, "Check this: " + d.uncertain) : null,
-    d.newCategory ? h("div", {class:"note info"}, `Suggested new category: ${d.newCategory}. It's going in Other for now. Ask Claude in chat to add the tab if you want it.`) : null,
-    h("div", {class:"grid"},
-      h("label", {class:"full"}, "Category (sheet tab)", tabSel),
-      ...fieldEls,
-      h("label", {}, "Condition", condSel),
-      h("label", {}, "Qty", h("input", {id: pre + "qty", type:"number", min:"1", step:"1", inputmode:"numeric", value:String(d.qty), oninput: e => { d.qty = e.target.value; }})),
-      h("label", {class:"clay"}, h("span", {class:"k"}, "Claude's estimate (each, $)"),
-        h("input", {id: pre + "est", type:"number", min:"0", step:"0.01", inputmode:"decimal", value:String(d.estimate), oninput: e => { d.estimate = e.target.value; }})),
-      h("label", {}, "Status", h("select", {id: pre + "status", onchange: e => { d.status = e.target.value; }},
-        STATUSES.map(s => h("option", {value:s, selected: s === d.status}, s)))),
-      h("label", {}, "What you paid (each, optional)", h("input", {id: pre + "paid", type:"number", min:"0", step:"0.01", inputmode:"decimal", value:String(d.paid ?? ""), oninput: e => { d.paid = e.target.value; }})),
-      h("div", {class:"est full"}, `${range ? range + " " : ""}This is a guess. After you approve, the price check replaces it with a price from real sales.`),
-      h("label", {class:"full"}, "Notes", h("textarea", {id: pre + "notes", oninput: e => { d.notes = e.target.value; }}, d.notes)),
-    ),
-    h("div", {class:"row"},
-      h("button", {type:"button", class:"primary", onclick: () => approve(it)}, "Approve and save"),
-      it.group ? null : h("button", {type:"button", onclick: () => addMore(it)}, addPhotoLabel(it)),
-      h("button", {type:"button", class:"ghost", onclick: () => { it.open = false; render(it); }}, "Done editing"),
-      it.group ? null : h("button", {type:"button", class:"ghost", onclick: () => identify(it)}, "Identify again"),
-      h("button", {type:"button", class:"ghost", onclick: () => remove(it)}, "Discard")),
-  ];
-}
-
-function switchTab(it, tab){
-  const old = it.draft.fields, fields = {};
-  const oldFirst = Object.values(old)[0] || "";
-  fieldsOf(tab).forEach((f, n) => { fields[f] = old[f] ?? (n === 0 ? oldFirst : ""); });
-  it.draft.tab = tab; it.draft.fields = fields;
-  if (!TABS[tab].cond.includes(it.draft.cond)) it.draft.cond = TABS[tab].cond[0];
-  render(it);
-}
-function addMore(it){
-  const inp = h("input", {type:"file", accept:"image/*", multiple:true, class:"sr"});
-  inp.onchange = () => { for (const f of inp.files) if (f.type.startsWith("image/")) { it.photos.push(f); it.rot.push(0); } inp.remove(); render(it); };
-  document.body.append(inp); inp.click();
-}
-function remove(it){
-  const i = items.indexOf(it); if (i >= 0) items.splice(i, 1);
-  document.getElementById("item-" + it.id)?.remove();
-  updateReviewHead();
-}
-
-// ---------- duplicates ----------
-const norm = v => String(v ?? "").trim().toLowerCase();
-const uploads = new Map(); // shared photo of a several-items photo: group id -> Drive link
-
-/** A row in the tab with the same name, the same filled-in details, and the same condition. */
-async function findDuplicate(d){
-  const cfg = TABS[d.tab], cols = cfg.cols;
-  const qtyCol = cols.indexOf("@qty"), condCol = cols.indexOf("@cond"), statusCol = cols.indexOf("@status");
-  const last = Math.max(qtyCol, condCol, statusCol);
-  const got = await mcp.callTool("Google Sheets", "get_values", {spreadsheetId: SHEET, range: `'${d.tab}'!A2:${L(last)}`}, {cache: false});
-  const rows = got?.payload?.values || [];
-  const fields = fieldsOf(d.tab);
-  for (let i = 0; i < rows.length; i++){
-    const r = rows[i];
-    if (!norm(r[0]) || norm(r[0]) !== norm(d.fields[fields[0]])) continue;
-    if (norm(r[statusCol]) === "sold") continue;
-    const same = fields.slice(1).every(f => {
-      const mine = norm(d.fields[f]), theirs = norm(r[cols.indexOf(f)]);
-      return !mine || !theirs || mine === theirs;
-    });
-    if (!same) continue;
-    if (norm(r[condCol]) && norm(r[condCol]) !== norm(d.cond)) continue;
-    return {row: i + 2, qty: Math.max(1, parseInt(r[qtyCol], 10) || 1), cond: r[condCol] || ""};
-  }
-  return null;
-}
-
-async function addToExisting(it){
-  const d = it.draft, cfg = TABS[d.tab];
-  const add = Math.max(1, parseInt(d.qty, 10) || 1);
-  it.state = "saving"; it.error = "";
-  it.steps = [{key:"qty", text:`Updating the quantity in row ${it.dup.row}`, state:"doing"}];
-  render(it);
-  try {
-    // Re-read the row first, so a sheet edited in the meantime isn't overwritten.
-    const got = await mcp.callTool("Google Sheets", "get_values", {spreadsheetId: SHEET, range: `'${d.tab}'!A${it.dup.row}:${L(cfg.cols.indexOf("@qty"))}${it.dup.row}`}, {cache: false});
-    const r = got?.payload?.values?.[0] || [];
-    if (norm(r[0]) !== norm(d.fields[fieldsOf(d.tab)[0]])) throw {code: "row_moved"};
-    const qty = (Math.max(1, parseInt(r[cfg.cols.indexOf("@qty")], 10) || 1)) + add;
-    await mcp.callTool("Google Sheets", "update_values",
-      {spreadsheetId: SHEET, range: `'${d.tab}'!${L(cfg.cols.indexOf("@qty"))}${it.dup.row}`, values: [[qty]]});
-    it.steps = [{key:"qty", text:`Quantity in ${d.tab}, row ${it.dup.row} is now ${qty}. No new row or photo added.`, state:"done"}];
-    it.state = "saved";
-  } catch (e){
-    it.state = "dup";
-    it.error = e?.code === "row_moved" ? "That row changed in the sheet. Add it as a new row, or check the sheet first." : mcpWhy(e);
-  }
-  render(it);
-}
-
-// ---------- approve: Drive photo, Sheets row, price check ----------
-const clean = s => String(s || "").replace(/[\\/:*?"<>|#%]+/g, " ").replace(/\s+/g, " ").trim();
-const safeCell = v => typeof v === "string" && /^[=+@]/.test(v) ? "'" + v : v;
-
-async function approve(it){
-  const d = it.draft;
-  const name = (d.fields[fieldsOf(d.tab)[0]] || "").trim();
-  if (!name){ it.error = `Add a ${fieldsOf(d.tab)[0]} before approving.`; it.state = "draft"; render(it); return; }
-  if (!mcp){ it.state = "savefail"; it.error = "Google Drive and Sheets aren't reachable from this view. Open the page in the Claude app or on claude.ai."; it.steps = []; render(it); return; }
-  const cfg = TABS[d.tab];
-  const done = it.done || (it.done = {});
-
-  // Already in the sheet? Offer to raise the quantity instead of adding a second row.
-  if (!done.row && !it.dupDecision){
-    try {
-      const dup = await findDuplicate(d);
-      if (dup){ it.dup = dup; it.state = "dup"; render(it); return; }
-    } catch { /* if the check fails, add the row as usual */ }
-  }
-
-  it.state = "saving"; it.error = "";
-  it.steps = [
-    {key:"photo", text: done.photoUrl ? "Photo saved to Drive" : `Saving ${isCardTab(d.tab) && it.photos.length > 1 && !it.group ? "front and back" : it.photos.length > 1 ? "photos" : "photo"} to the ${d.tab} folder`, state: done.photoUrl ? "done" : "doing"},
-    {key:"row", text: done.row ? `Added to ${d.tab}, row ${done.row}` : `Adding the row to ${d.tab}`, state: done.row ? "done" : ""},
-    {key:"price", text:"Starting the price check", state:""},
-  ];
-  render(it);
-  const step = (k, state, text) => { const s = it.steps.find(x => x.key === k); s.state = state; if (text) s.text = text; render(it); };
-
-  // 1. photos
-  if (!done.photoUrl && it.group && uploads.has(it.group.id)){
-    done.photoUrl = await uploads.get(it.group.id).catch(() => null);
-    if (done.photoUrl) step("photo", "done", "Photo already saved with the other items from this photo");
-  }
-  if (!done.photoUrl){
-    let resolveShared;
-    if (it.group) uploads.set(it.group.id, new Promise((res, rej) => { resolveShared = {res, rej}; }));
-    try {
-      const yr = d.fields["Year"] || d.fields["Date"] || "";
-      const stamp = new Date().toISOString().slice(0, 16).replace("T", " ").replace(":", "-");
-      const base = it.group ? `${clean(d.tab)} - ${it.group.count}-item photo - ${stamp}` : [clean(d.tab), clean(name), clean(yr)].filter(Boolean).join(" - ");
-      const urls = [];
-      for (let i = 0; i < it.photos.length; i++){
-        const side = sideOf(it, i);
-        const title = base + (side ? ` - ${side.toLowerCase()}` : (i ? ` (${i + 1})` : "")) + ".jpg";
-        let content;
-        if (fileArgs){
-          const blob = await toJpeg(it.photos[i], 2400, 0.88, it.rot[i]);
-          content = {$file: {data: blob, name: title, type: "image/jpeg"}};
-        } else {
-          let blob = await toJpeg(it.photos[i], 1400, 0.8, it.rot[i]);
-          if (blob.size > 700000) blob = await toJpeg(it.photos[i], 1100, 0.72, it.rot[i]);
-          content = await toBase64(blob);
-        }
-        const res = await mcp.callTool("Google Drive", "create_file",
-          {title, parentId: cfg.folder, contentMimeType: "image/jpeg", disableConversionToGoogleType: true, base64Content: content});
-        const p = res?.payload || {};
-        urls.push(p.viewUrl || (p.id ? `https://drive.google.com/file/d/${p.id}/view` : ""));
-      }
-      done.photoUrl = urls[0] || "none";
-      done.backUrl = isCardTab(d.tab) && !it.group ? (urls[1] || "") : "";
-      resolveShared?.res(done.photoUrl);
-      step("photo", "done", done.backUrl ? "Saved the front and back to Drive" : `Saved ${it.photos.length > 1 ? it.photos.length + " photos" : "photo"} as “${base}.jpg”`);
-    } catch (e){
-      if (it.group) uploads.delete(it.group.id);
-      resolveShared?.rej(e);
-      step("photo", "fail"); it.state = "savefail";
-      it.error = e?.code ? mcpWhy(e) : "The photo couldn't be prepared for upload. Try a different photo.";
-      render(it); return;
+    const title = `${sessionStamp} ${pad(p.n)}.jpg`;
+    let content;
+    if (fileArgs){ content = {$file: {data: await toJpeg(p.file, 2000, 0.88), name: title, type: "image/jpeg"}}; }
+    else {
+      let blob = await toJpeg(p.file, 1600, 0.82);
+      if (blob.size > 700000) blob = await toJpeg(p.file, 1200, 0.75);
+      content = await toBase64(blob);
     }
-  }
-
-  // 2. sheet row
-  if (!done.row){
-    step("row", "doing");
-    try {
-      const got = await mcp.callTool("Google Sheets", "get_values", {spreadsheetId: SHEET, range: `'${d.tab}'!A:A`}, {cache: false});
-      const rowNum = ((got?.payload?.values) || []).length + 1;
-      const est = Number(d.estimate) > 0 ? Math.round(Number(d.estimate) * 100) / 100 : "";
-      const tag = est !== "" ? `[Estimate $${est}, not verified yet] ` : "[No estimate yet] ";
-      const values = cfg.cols.map(c => {
-        switch (c){
-          case "@cond": return d.cond;
-          case "@qty": return Math.max(1, parseInt(d.qty, 10) || 1);
-          case "@mv": return est;
-          case "@auto": return null;
-          case "@lc": return "";
-          case "@status": return d.status;
-          case "@photo": return done.photoUrl && done.photoUrl !== "none" ? `=HYPERLINK("${done.photoUrl}","Photo")` : "";
-          case "@notes": return tag + d.notes.trim();
-          case "@sold": case "@solddate": case "@psa9": case "@psa10": return null;
-          case "@back": return done.backUrl ? `=HYPERLINK("${done.backUrl}","Back")` : "";
-          case "@paid": return Number(d.paid) > 0 ? Math.round(Number(d.paid) * 100) / 100 : "";
-          default: return safeCell((d.fields[c] || "").trim());
-        }
-      });
-      await mcp.callTool("Google Sheets", "update_values",
-        {spreadsheetId: SHEET, range: `'${d.tab}'!A${rowNum}:${L(cfg.cols.length - 1)}${rowNum}`, values: [values]});
-      done.row = rowNum;
-      step("row", "done", `Added to ${d.tab}, row ${rowNum}`);
-      remember({tab: d.tab, row: rowNum, name, estimate: est, at: Date.now()});
-    } catch (e){
-      step("row", "fail"); it.state = "savefail";
-      it.error = mcpWhy(e) + (e?.code === "server_unavailable" || e?.code === "upstream_error" ? " The row may have been added anyway, so check the sheet first." : "");
-      render(it); return;
-    }
-  }
-
-  // 3. price check
-  step("price", "doing");
-  try {
-    await mcp.callTool("Claude Code Remote", "fire_trigger",
-      {trigger_id: TRIGGER, text: `New item to price first: '${d.tab}' row ${done.row} (${name}).`});
-    step("price", "done", "Price check started. The verified price usually lands within a few minutes.");
+    await mcp.callTool("Google Drive", "create_file",
+      {title, parentId: INBOX, contentMimeType: "image/jpeg", disableConversionToGoogleType: true, base64Content: content});
+    p.state = "ok"; uploaded++; unsent++; err.hidden = true;
   } catch (e){
-    step("price", "done", "The price check couldn't start now. It will run tonight at 3:30 AM.");
+    p.state = "fail"; err.hidden = false;
+    err.textContent = e?.code ? mcpWhy(e) : "A photo couldn't be prepared. Try it again or take a new one.";
   }
-  it.state = "saved"; render(it);
+  draw(p); showBar();
 }
 
-// ---------- recently added ----------
-const KEY = "intake-recent-v1";
-function loadRecent(){ try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { return []; } }
-function saveRecent(list){ try { localStorage.setItem(KEY, JSON.stringify(list.slice(0, 30))); } catch {} }
-let recent = loadRecent();
-function remember(r){ recent = [r, ...recent.filter(x => !(x.tab === r.tab && x.row === r.row))]; saveRecent(recent); renderRecent(); }
+function showBar(){
+  const busy = photos.filter(p => p.state === "up").length, failed = photos.filter(p => p.state === "fail").length;
+  document.getElementById("bar").hidden = !photos.length; document.body.classList.toggle("shooting", photos.length > 0);
+  const parts = [`<b>${uploaded} photo${uploaded === 1 ? "" : "s"} sent</b>`];
+  if (busy) parts.push(`${busy} uploading`);
+  if (failed) parts.push(`${failed} failed`);
+  document.getElementById("count").innerHTML = parts.join(" · ");
+}
 
-function renderRecent(){
-  const box = document.getElementById("recent");
-  box.replaceChildren();
-  if (!recent.length){ box.append(h("div", {class:"empty"}, "Nothing added yet. Items you approve on this device show up here.")); return; }
-  for (const r of recent){
-    let priceEl;
-    if (r.verified) priceEl = h("span", {class:"price ok"}, `${r.value} verified`);
-    else if (r.checkErr) priceEl = h("span", {class:"price"}, r.checkErr);
-    else priceEl = h("span", {class:"price pending"}, r.estimate !== "" && r.estimate != null ? `$${Number(r.estimate).toFixed(2)} estimate` : "Waiting for a price");
-    box.append(h("div", {class:"ritem"},
-      h("div", {class:"t"}, h("b", {}, r.name), h("small", {}, `${r.tab}, row ${r.row}${r.detail ? " · " + r.detail : ""}`)),
-      priceEl));
+// Start the background task when you tap Done, or by itself a minute after the last upload.
+// Anything it misses is picked up by the nightly run.
+function settle(){
+  clearTimeout(idle);
+  if (photos.some(p => p.state === "up")) return;
+  if (doneAsked) finish(true);
+  else if (unsent) idle = setTimeout(() => finish(false), 60000);
+}
+async function finish(tapped){
+  clearTimeout(idle);
+  if (photos.some(p => p.state === "up")){ if (tapped){ doneAsked = true; banner("Still uploading. Claude starts as soon as the last photo is up."); } return; }
+  doneAsked = false;
+  if (!unsent){ if (tapped) done(); return; }
+  const n = unsent; unsent = 0;
+  try {
+    await mcp.callTool("Claude Code Remote", "fire_trigger", {trigger_id: TRIGGER, text: `New photos in the Collection Intake inbox (${n}).`});
+    if (tapped) done();
+    banner(`Claude is on it. Your items show up in the sheet and the app in a few minutes.`, "ok");
+  } catch {
+    if (tapped) done();
+    banner("The photos are saved. Claude adds them tonight at 3:30 AM.", "ok");
   }
 }
-renderRecent();
-
-document.getElementById("refreshAll").onclick = async (ev) => {
-  const btn = ev.currentTarget;
-  if (!mcp){ banner("Connectors aren't available in this view, so prices can't be checked here."); return; }
-  btn.disabled = true; btn.textContent = "Updating…";
-  for (const r of recent.slice(0, 15)){
-    const cols = TABS[r.tab]?.cols; if (!cols) continue;
-    try {
-      const res = await mcp.callTool("Google Sheets", "get_values",
-        {spreadsheetId: SHEET, range: `'${r.tab}'!A${r.row}:${L(cols.length - 1)}${r.row}`}, {cache: false});
-      const row = res?.payload?.values?.[0] || [];
-      const mv = row[cols.indexOf("@mv")] || "", lc = row[cols.indexOf("@lc")] || "", notes = row[cols.indexOf("@notes")] || "";
-      r.checkErr = "";
-      if ((row[0] || "").trim() !== r.name.trim()){ r.verified = false; r.checkErr = "Row changed in the sheet"; }
-      else if (lc){ r.verified = true; r.value = mv || "No value"; const m = notes.match(/(median of \d+ sold[^.]*|no reliable sold data)/i); r.detail = m ? m[1] : `checked ${lc}`; }
-      else { r.verified = false; r.detail = "price check pending"; }
-    } catch (e){ r.checkErr = e?.code === "server_unavailable" ? "Sheets didn't respond" : "Couldn't check"; }
-  }
-  saveRecent(recent); renderRecent();
-  btn.disabled = false; btn.textContent = "Update prices";
-};
+function done(){
+  document.getElementById("bar").hidden = true; document.body.classList.remove("shooting");
+}
 })();
 </script>
-

@@ -99,7 +99,7 @@ test("notes helpers", () => {
     priceSummary("Box wear. Verified $22 on 2026-11-06: median of 5 sold (eBay). Extra.", "verified"),
     "Verified $22 on 2026-11-06: median of 5 sold (eBay).",
   );
-  assert.match(priceSummary("", "estimate"), /estimate/);
+  assert.match(priceSummary("", "estimate"), /not checked/i);
 });
 
 test("itemCells writes only editable columns that exist, never Auto columns", () => {

@@ -44,6 +44,12 @@ export function labeledPhotos(item: Pick<Item, "category" | "photos">): { photos
   return { photos, missing: photos.length ? missing : [] };
 }
 
+/** What Claude asked you to check when it added the item from photos ("Check this: ..." in Notes), or null. */
+export function checkNote(item: Pick<Item, "notes">): string | null {
+  const m = /check this:\s*([^\n]+?)(?=\s*(?:verified \$|price check \d|set by hand|$))/i.exec(item.notes ?? "");
+  return m ? m[1]!.trim().replace(/[.\s]+$/, "") : null;
+}
+
 export const SORTS = {
   value: "Highest value",
   name: "Name",

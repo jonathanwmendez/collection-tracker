@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getItem, getSettings } from "@/lib/data";
 import { categoryByName } from "@/lib/categories";
-import { gradingMath, isStale, itemTotal, labeledPhotos, marketLink, realizedGain, sheetLink, unrealizedGain } from "@/lib/collection";
+import { checkNote, gradingMath, isStale, itemTotal, labeledPhotos, marketLink, realizedGain, sheetLink, unrealizedGain } from "@/lib/collection";
 import { money, shortDate, signedMoney } from "@/lib/format";
 import { canCheckPrice } from "@/lib/prices";
 import { ItemActions } from "@/components/item-actions";
@@ -54,6 +54,17 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
+      {checkNote(item) && (
+        <div className="rounded-xl bg-warn-soft px-4 py-3 text-sm text-warn flex flex-col gap-1">
+          <span>
+            <span className="font-medium">Check this:</span> {checkNote(item)}.
+          </span>
+          <span>
+            <Link href={`/items/${item.id}/edit`}>Edit the item</Link> to fix anything wrong, and remove the &quot;Check this&quot; note from Notes when you&apos;re done.
+          </span>
+        </div>
+      )}
+
       {item.photos.length > 0 && (
         <PhotoGallery
           photos={labeledPhotos(item).photos.map((p, n) => ({
@@ -85,7 +96,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
         </div>
         {item.value_status === "estimate" && (
           <p className="text-sm rounded-lg bg-clay-soft text-clay-ink px-3 py-2">
-            This is Claude&apos;s estimate from the photo. Claude&apos;s price check verifies it against real sales, right after approval or at 3:30 AM.
+            This value isn&apos;t checked against real sales yet. Claude&apos;s background task prices it soon, or at 3:30 AM at the latest.
           </p>
         )}
         {history.length > 0 && (

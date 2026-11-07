@@ -280,7 +280,7 @@ export function cellRange(tab: string, col: number, row: number): string {
 
 /** A one-line description of where an item's current value came from, taken from its notes. */
 export function priceSummary(notes: string, status: ValueStatus): string {
-  if (status === "estimate") return "Claude's estimate from the photos, not yet checked against sales.";
+  if (status === "estimate") return "Not checked against sales yet.";
   const lower = notes.toLowerCase();
   const marks = ["verified $", "price check ", "set by hand"];
   let at = -1;

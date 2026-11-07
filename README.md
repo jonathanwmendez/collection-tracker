@@ -16,14 +16,14 @@ A Google Sheet is the main copy of the collection. Three pieces work on it:
 
 | Piece | Runs on | What it does |
 |---|---|---|
-| **Collection Intake** | A Claude artifact | Take photos in a row (cards front then back, one item per photo, or a binder page of up to 9 cards), or pick them from your library. Claude identifies each item and estimates its value while you keep shooting. You approve one at a time or all ready items at once; it checks for duplicates and saves the photos to Drive and a row to the sheet |
-| **Price check** | A Claude scheduled task, nightly at 3:30 AM, plus right after each approval | Prices new rows from recent sold listings, rechecks the oldest prices past the repricing window (30 days by default) until 8:00 AM, adds PSA 9 and PSA 10 prices for ungraded cards, emails alerts for big moves, and logs each run with tokens used to a Price Log tab |
+| **Collection Intake** | A Claude artifact | Take photos (or pick them from your library) and you're done. They upload to a Drive inbox and start the background task |
+| **Background task** | A Claude scheduled task, nightly at 3:30 AM, plus right after you take photos | Identifies new photos (pairs card fronts with backs, splits binder pages), checks for duplicates, saves each item to the sheet with a "Check this" note when unsure, and prices it from recent sold listings. Nightly, it also rechecks prices older than the repricing window (30 days by default) until 8:00 AM, adds PSA 9 and PSA 10 prices for ungraded cards, emails alerts for big moves, and logs each run with tokens used to a Price Log tab |
 | **This web app** | Vercel + Supabase | Syncs from the sheet every morning and whenever you open it, to browse, search, edit, analyze, and share the collection |
 
 Identifying and pricing run inside Claude, on a Claude subscription. The web app makes no paid AI calls.
 
 **App features:**
-- Collection: search, category lists with filters, item pages with full-screen photos (cards show front and back) and price history
+- Collection: search, category lists with filters, item pages with full-screen photos (cards show front and back) and price history, and a list of items Claude flagged to check
 - Editing saved to the sheet (each write checks it still has the right row), delete, queue for repricing, add without a photo with a duplicate check
 - Profit tracking: what you paid, what you sold for, gain so far, and realized profit
 - Value dashboard: total over time (snapshot every morning), change by category, biggest price moves, grading candidates, price upkeep, CSV export
@@ -41,19 +41,19 @@ About 30 minutes. Do the steps in order: each one uses an address from the one b
 
 | Connector | Used by | For |
 |---|---|---|
-| Google Sheets | Setup, Collection Intake, price check | Reading and writing the sheet |
-| Google Drive | Setup, Collection Intake | Photo folders and uploads |
-| Gmail | Price check | Price alert emails. Optional: without it, alerts go in the Price Log tab instead |
+| Google Sheets | Setup, background task | Reading and writing the sheet |
+| Google Drive | Setup, Collection Intake, background task | Photo folders, uploads, and reading photos |
+| Gmail | Background task | Price alert emails. Optional: without it, alerts go in the Price Log tab instead |
 | Supabase | Setup | Optional. Runs the database migrations for you (create the Supabase project in step 2.1 first) |
 | Vercel | Setup | Optional. Creates the Vercel project and adds the variables that aren't secret |
 
-Collection Intake also starts the price check right after you approve items, using Claude's own scheduled task tools. Nothing to connect for that.
+Collection Intake starts the background task right after you take photos, using Claude's own scheduled task tools. Nothing to connect for that.
 
 Google Cloud has no connector. If Claude can use a browser where you're signed in to Google Cloud (such as Claude in Chrome), the setup prompt does step 3 for you, except copying the client secret.
 
 ### 1. Claude
 
-Paste [`claude/SETUP.md`](claude/SETUP.md) into a new Claude conversation, after filling in your time zone where the prompt asks for it. It creates the sheet, photo folders, nightly price check, and Collection Intake, and gives you the sheet and Intake links for step 6.
+Paste [`claude/SETUP.md`](claude/SETUP.md) into a new Claude conversation, after filling in your time zone where the prompt asks for it. It creates the sheet, photo folders, the background task, and Collection Intake, and gives you the sheet and Intake links for step 6.
 
 ### 2. Supabase
 
@@ -147,7 +147,7 @@ For local sign-in, also add `http://localhost:3000` to the Google client's JavaS
 | `src/lib/shares.ts`, `src/app/s/` | Share links and the public view-only pages |
 | `src/app/api/` | Sync, daily sync, item edit/delete/reprice/price, settings, export, access requests, admin, account deletion, photo previews |
 | `supabase/migrations/` | Tables: items, photos, price_checks, value_snapshots, settings, google_tokens, members, access_requests, shares |
-| `claude/` | Setup prompt, Collection Intake page, and price check prompt |
+| `claude/` | Setup prompt, Collection Intake page, and the background task prompt (`price-check.md`) |
 | `vercel.json` | Daily sync schedule, and a redirect from this deployment's old address (safe to remove in a fork) |
 | `tests/` | Unit tests for row parsing, price lookups, access and share rules, collection math, and CSV export |
 

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getItems, getSettings } from "@/lib/data";
 import { CATEGORIES } from "@/lib/categories";
-import { isSold, itemTotal, matchesQuery, sortItems, summarize } from "@/lib/collection";
+import { checkNote, isSold, itemTotal, matchesQuery, sortItems, summarize } from "@/lib/collection";
 import { money, plural } from "@/lib/format";
 import { EmptyState } from "@/components/empty-state";
 import { ItemList } from "@/components/item-row";
@@ -52,6 +52,11 @@ export default async function CollectionPage({ searchParams }: { searchParams: P
       </div>
 
       <SyncBar />
+      {!query && items.filter((i) => checkNote(i)).length > 0 && (
+        <Link href="/collection?q=check%20this" className="rounded-xl bg-warn-soft px-4 py-3 text-sm text-warn no-underline">
+          <span className="font-medium">{plural(items.filter((i) => checkNote(i)).length, "item")} to check.</span> Claude wasn&apos;t sure about some details. Tap to see them.
+        </Link>
+      )}
       <SearchBox action="/collection" defaultValue={query} placeholder="Search names, sets, years, notes" />
 
       {query ? (

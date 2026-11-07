@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { gradingMath, isStale, labeledPhotos, marketLink, matchesQuery, realizedGain, sortItems, staleCutoff, subtitle, summarize, unrealizedGain, type Item } from "../src/lib/collection";
+import { checkNote, gradingMath, isStale, labeledPhotos, marketLink, matchesQuery, realizedGain, sortItems, staleCutoff, subtitle, summarize, unrealizedGain, type Item } from "../src/lib/collection";
 
 const base: Item = {
   id: "1",
@@ -98,4 +98,10 @@ test("labels a card's photos Front and Back, and lists a missing back", () => {
   assert.deepEqual(none.missing, []);
   const figure = labeledPhotos({ category: "Figures", photos: [photo("x", 0, null)] });
   assert.equal(figure.photos[0]!.label, undefined);
+});
+
+test("finds what Claude asked you to check in Notes", () => {
+  assert.equal(checkNote({ notes: "Read from the front and back. Check this: edition not visible. Verified $12 on 2026-11-08: TCGplayer market price (TCGplayer)." }), "edition not visible");
+  assert.equal(checkNote({ notes: "Check this: could be the 1st Edition printing" }), "could be the 1st Edition printing");
+  assert.equal(checkNote({ notes: "Verified $12 on 2026-11-08: median of 6 sold (eBay)." }), null);
 });

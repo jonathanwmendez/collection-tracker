@@ -30,7 +30,7 @@ export default async function AddPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-bold tracking-tight">Add items</h1>
-        <p className="text-muted">Take photos in Collection Intake. Claude identifies each item using your Claude plan and saves it to your sheet.</p>
+        <p className="text-muted">Take photos in Collection Intake. Claude identifies each item in the background, using your Claude plan, and saves and prices it.</p>
       </div>
 
       <section className="rounded-2xl border border-line bg-surface p-5 flex flex-col items-center text-center gap-4">
@@ -56,9 +56,9 @@ export default async function AddPage() {
           </Link>
         )}
         <ol className="text-sm text-muted text-left flex flex-col gap-1 max-w-sm list-decimal pl-5">
-          <li>Add a photo of each item and check what Claude found.</li>
-          <li>Approve it. Claude saves the photo to Drive and the row to your sheet.</li>
-          <li>Come back here. New items appear after the sync. Approving starts a price check right away, and the verified price usually lands within minutes.</li>
+          <li>Take photos. For a card, take the front, then the back.</li>
+          <li>Tap Done. Claude identifies, saves, and prices the items in the background.</li>
+          <li>Come back here in a few minutes. Anything Claude wasn&apos;t sure about is listed on the Collection page to check.</li>
         </ol>
       </section>
 
