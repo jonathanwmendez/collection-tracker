@@ -3,6 +3,7 @@ import { categoryByName } from "@/lib/categories";
 import { itemTotal, marketLink } from "@/lib/collection";
 import { money, shortDate } from "@/lib/format";
 import { getShare, getSharedItem } from "@/lib/shares";
+import { PhotoGallery } from "@/components/photo-gallery";
 import { Unavailable } from "../../unavailable";
 
 export default async function SharedItemPage({ params }: { params: Promise<{ token: string; id: string }> }) {
@@ -30,17 +31,14 @@ export default async function SharedItemPage({ params }: { params: Promise<{ tok
       </div>
 
       {item.photos.length > 0 && (
-        <section aria-label="Photos" className="flex gap-3 overflow-x-auto snap-x pb-1 -mx-1 px-1">
-          {item.photos.map((p, n) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              key={p.id}
-              src={`/api/share/${token}/photos/${p.id}`}
-              alt={`${item.name}, photo ${n + 1}`}
-              className="snap-start shrink-0 h-72 w-auto max-w-[85vw] rounded-2xl border border-line bg-navy-soft object-contain"
-            />
-          ))}
-        </section>
+        <PhotoGallery
+          photos={item.photos.map((p, n) => ({
+            id: p.id,
+            preview: `/api/share/${token}/photos/${p.id}`,
+            full: `/api/share/${token}/photos/${p.id}?size=full`,
+            alt: `${item.name}, photo ${n + 1}`,
+          }))}
+        />
       )}
 
       {share.show_values && (

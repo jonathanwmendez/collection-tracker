@@ -22,8 +22,10 @@ export async function DELETE(request: Request) {
   const admin = createAdminClient();
 
   // Previews in Storage aren't removed by the database cascade.
-  const { data: photos } = await supabase.from("photos").select("preview_path");
-  const paths = (photos ?? []).map((p) => p.preview_path as string | null).filter((p): p is string => Boolean(p));
+  const { data: photos } = await supabase.from("photos").select("id, item_id, preview_path");
+  const paths = (photos ?? []).flatMap((p) =>
+    [p.preview_path as string | null, `${user.id}/${p.item_id}/${p.id}-full.jpg`].filter((x): x is string => Boolean(x)),
+  );
   for (let i = 0; i < paths.length; i += 500) await admin.storage.from("previews").remove(paths.slice(i, i + 500));
 
   // Tell Google to forget the app's access.

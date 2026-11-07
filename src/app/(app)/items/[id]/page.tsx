@@ -7,6 +7,7 @@ import { isStale, itemTotal, marketLink, sheetLink } from "@/lib/collection";
 import { money, shortDate } from "@/lib/format";
 import { canCheckPrice } from "@/lib/prices";
 import { ItemActions } from "@/components/item-actions";
+import { PhotoGallery } from "@/components/photo-gallery";
 import { Sparkline } from "@/components/sparkline";
 import { StatusBadge, ValueBadge } from "@/components/value-badge";
 
@@ -54,25 +55,15 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
       </div>
 
       {item.photos.length > 0 && (
-        <section aria-label="Photos" className="flex gap-3 overflow-x-auto snap-x pb-1 -mx-1 px-1">
-          {item.photos.map((p, n) => (
-            <a
-              key={p.id}
-              href={p.drive_url ?? "#"}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="snap-start shrink-0"
-              aria-label={`Open photo ${n + 1} full size in Google Drive`}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`/api/photos/${p.id}/preview`}
-                alt={`${item.name}, photo ${n + 1}`}
-                className="h-72 w-auto max-w-[85vw] rounded-2xl border border-line bg-navy-soft object-contain"
-              />
-            </a>
-          ))}
-        </section>
+        <PhotoGallery
+          photos={item.photos.map((p, n) => ({
+            id: p.id,
+            preview: `/api/photos/${p.id}/preview`,
+            full: `/api/photos/${p.id}/preview?size=full`,
+            alt: `${item.name}, photo ${n + 1}`,
+            driveUrl: p.drive_url,
+          }))}
+        />
       )}
 
       <section aria-labelledby="value" className="rounded-2xl border border-line bg-surface p-4 flex flex-col gap-3">

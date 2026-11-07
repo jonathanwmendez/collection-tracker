@@ -150,9 +150,10 @@ export async function syncCollection(supabase: SupabaseClient, userId: string): 
 
   // Previews for removed photos and removed items.
   const removedIds = new Set(removed.map((r) => r.id));
-  const goneFiles = [...stalePhotos, ...photos.filter((p) => removedIds.has(p.item_id))]
-    .map((p) => p.preview_path)
-    .filter((p): p is string => Boolean(p));
+  // Each photo can have a preview and a full-screen copy in Storage.
+  const goneFiles = [...stalePhotos, ...photos.filter((p) => removedIds.has(p.item_id))].flatMap((p) =>
+    [p.preview_path, `${userId}/${p.item_id}/${p.id}-full.jpg`].filter((x): x is string => Boolean(x)),
+  );
   if (goneFiles.length) await supabase.storage.from("previews").remove(goneFiles);
   for (const part of chunks(stalePhotos.map((p) => p.id))) await supabase.from("photos").delete().in("id", part);
   for (const part of chunks([...removedIds])) await supabase.from("items").delete().in("id", part);

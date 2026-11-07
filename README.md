@@ -14,7 +14,7 @@ A Google Sheet is the main copy of the collection. Three pieces work on it:
 
 Identifying and pricing run inside Claude, on a Claude subscription. The web app makes no paid AI calls.
 
-**App features:** invite-only accounts with an Admin page and a setup checklist for each new person, view-only share links, sync on open, search, category lists with filters, item pages with photos and price history, edits saved to the sheet (each write checks it still has the right row), delete, queue for repricing, a repricing window kept the same in the app and the sheet, free card prices for Magic, Pokémon, and Yu-Gi-Oh! (Scryfall, Pokémon TCG API, YGOPRODeck), a value dashboard with value over time, and adding items without a photo.
+**App features:** invite-only accounts with an Admin page and a setup checklist for each new person, view-only share links, sync on open, search, category lists with filters, item pages with full-screen photos and price history, edits saved to the sheet (each write checks it still has the right row), delete, queue for repricing, a repricing window kept the same in the app and the sheet, free card prices for Magic, Pokémon, and Yu-Gi-Oh! (Scryfall, Pokémon TCG API, YGOPRODeck), a value dashboard with value over time, and adding items without a photo.
 
 **Built with:** Next.js 15, TypeScript, Tailwind CSS, Supabase (Postgres, Auth, Storage), Google Sheets and Drive APIs, Vercel.
 
@@ -85,7 +85,7 @@ The Admin page shows each person's progress (signed in, Google, sheet, Intake, s
 
 ## Sharing
 
-**Collection > Share** creates view-only links. For each link, pick the categories, whether values and notes show, and when it expires. Anyone with the link can browse, search, and open items without an account. Links never expose the sheet, Drive links, or anything else in your Google account. The Share page shows each link's views, and **Turn off** disables it for good.
+**Collection > Share** creates view-only links. For each link, pick the categories, whether values and notes show, and when it expires. Anyone with the link can browse, search, and open items without an account, and tap a photo to see it full screen (swipe between photos, pinch to zoom). Links never expose the sheet, Drive links, or anything else in your Google account. The Share page shows each link's views, and **Turn off** disables it for good.
 
 ## Development
 
