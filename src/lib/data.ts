@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { toItem, type Item } from "./collection";
+import { computeMovers, type Move } from "./movers";
 
 export { staleCutoff } from "./collection";
 
@@ -76,12 +77,9 @@ export async function getSnapshots(supabase: SupabaseClient): Promise<Snapshot[]
   }));
 }
 
-export type Move = { id: string; name: string; category: string; from: number; to: number; change: number; pct: number; on: string };
+export type { Move } from "./movers";
 
-/**
- * Each item's latest value change, from its price history: the newest check compared with the check
- * before it that had a different value. Biggest moves in dollars first.
- */
+/** Each item's latest value change, from its price history in the last 90 days. */
 export async function getMovers(supabase: SupabaseClient, items: Item[], sinceDays = 90): Promise<Move[]> {
   const since = new Date(Date.now() - sinceDays * 86400000).toISOString();
   const { data } = await supabase
@@ -90,32 +88,8 @@ export async function getMovers(supabase: SupabaseClient, items: Item[], sinceDa
     .gte("checked_at", since)
     .order("checked_at", { ascending: false })
     .limit(5000);
-  const byItem = new Map<string, Array<{ value: number; at: string }>>();
-  for (const r of data ?? []) {
-    if (r.value === null) continue;
-    const list = byItem.get(r.item_id as string) ?? [];
-    list.push({ value: Number(r.value), at: r.checked_at as string });
-    byItem.set(r.item_id as string, list);
-  }
-  const moves: Move[] = [];
-  for (const i of items) {
-    if (i.status === "Sold") continue;
-    const list = byItem.get(i.id);
-    if (!list || list.length < 2) continue;
-    const latest = list[0]!;
-    const before = list.find((c) => c.value !== latest.value);
-    if (!before || before.value === 0) continue;
-    const change = i.quantity * (latest.value - before.value);
-    moves.push({
-      id: i.id,
-      name: i.name,
-      category: i.category,
-      from: before.value,
-      to: latest.value,
-      change,
-      pct: ((latest.value - before.value) / before.value) * 100,
-      on: latest.at,
-    });
-  }
-  return moves.sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
+  return computeMovers(
+    (data ?? []).map((r) => ({ item_id: r.item_id as string, value: r.value === null ? null : Number(r.value), checked_at: r.checked_at as string })),
+    items,
+  );
 }

@@ -2,19 +2,34 @@
 
 A phone-first web app for cataloging and valuing collectibles: sports cards, Magic: The Gathering, Yu-Gi-Oh!, Pokémon, figures, magazines, newspapers, ornaments, and more.
 
+**[Try the demo](https://collection-tracker-chi.vercel.app/demo)** (sample data, no sign-in).
+
+<p>
+  <img src="docs/collection.png" alt="Collection overview with categories and totals" width="260">
+  <img src="docs/value.png" alt="Value dashboard with total value, gains, and value over time" width="260">
+  <img src="docs/item.png" alt="Item page with value history, cost, and grading" width="260">
+</p>
+
 ## How it works
 
 A Google Sheet is the main copy of the collection. Three pieces work on it:
 
 | Piece | Runs on | What it does |
 |---|---|---|
-| **Collection Intake** | A Claude artifact | Take a photo. Claude identifies the item and estimates its value. You approve, and it saves the photo to Drive and a row to the sheet |
-| **Price check** | A Claude scheduled task, nightly at 3:30 AM, plus right after each approval | Prices new rows from recent sold listings, then rechecks the oldest prices past the repricing window (30 days by default) until 8:00 AM. Notes its sources and logs each run, with tokens used, to a Price Log tab |
-| **This web app** | Vercel + Supabase | Syncs from the sheet to browse, search, edit, and value the collection |
+| **Collection Intake** | A Claude artifact | Take a photo of one item, or a binder page of up to 9 cards. Claude identifies each item and estimates its value. You approve, it checks for duplicates, and it saves the photo to Drive and a row to the sheet |
+| **Price check** | A Claude scheduled task, nightly at 3:30 AM, plus right after each approval | Prices new rows from recent sold listings, rechecks the oldest prices past the repricing window (30 days by default) until 8:00 AM, adds PSA 9 and PSA 10 prices for ungraded cards, emails alerts for big moves, and logs each run with tokens used to a Price Log tab |
+| **This web app** | Vercel + Supabase | Syncs from the sheet every morning and whenever you open it, to browse, search, edit, analyze, and share the collection |
 
 Identifying and pricing run inside Claude, on a Claude subscription. The web app makes no paid AI calls.
 
-**App features:** invite-only accounts with an Admin page and a setup checklist for each new person, view-only share links, sync on open, search, category lists with filters, item pages with full-screen photos and price history, edits saved to the sheet (each write checks it still has the right row), delete, queue for repricing, a repricing window kept the same in the app and the sheet, free card prices for Magic, Pokémon, and Yu-Gi-Oh! (Scryfall, Pokémon TCG API, YGOPRODeck), a value dashboard with value over time, and adding items without a photo.
+**App features:**
+- Collection: search, category lists with filters, item pages with full-screen photos and price history
+- Editing saved to the sheet (each write checks it still has the right row), delete, queue for repricing, add without a photo with a duplicate check
+- Profit tracking: what you paid, what you sold for, gain so far, and realized profit
+- Value dashboard: total over time (snapshot every morning), change by category, biggest price moves, grading candidates, price upkeep, CSV export
+- Free card prices for Magic, Pokémon, and Yu-Gi-Oh! (Scryfall, Pokémon TCG API, YGOPRODeck)
+- Settings kept the same in the app and the sheet: repricing window, alert threshold, grading cost
+- Invite-only accounts with an Admin page and a setup checklist for each new person, and view-only share links
 
 **Built with:** Next.js 15, TypeScript, Tailwind CSS, Supabase (Postgres, Auth, Storage), Google Sheets and Drive APIs, Vercel.
 
@@ -29,7 +44,7 @@ Paste [`claude/SETUP.md`](claude/SETUP.md) into a Claude conversation with the G
 ### 2. Supabase
 
 1. Create a project at [supabase.com](https://supabase.com). Under **Security**: keep **Enable Data API** on, turn **Automatically expose new tables** off, turn **Enable automatic RLS** on.
-2. **SQL Editor:** run the four files in [`supabase/migrations/`](supabase/migrations) in order: `0001_init.sql`, `0002_sheet_sync.sql`, `0003_access.sql`, `0004_shares.sql`.
+2. **SQL Editor:** run the files in [`supabase/migrations/`](supabase/migrations) in order, `0001` through `0005`.
 3. **Settings > API Keys:** copy the project URL, a publishable key, and a secret key.
 
 ### 3. Google Cloud
@@ -58,6 +73,7 @@ Paste [`claude/SETUP.md`](claude/SETUP.md) into a Claude conversation with the G
 | `ADMIN_EMAILS` | Your Google account (the owner). Comma-separate to add more owners |
 | `GOOGLE_CLIENT_ID` | Google client ID |
 | `GOOGLE_CLIENT_SECRET` | Google client secret |
+| `CRON_SECRET` | A long random string. Vercel sends it to the daily sync so only Vercel can run it |
 | `POKEMONTCG_API_KEY` | Optional, raises the Pokémon price lookup limit ([pokemontcg.io](https://pokemontcg.io)) |
 
 If you change a variable later, redeploy for it to take effect.
@@ -101,16 +117,20 @@ For local sign-in, also add `http://localhost:3000` to the Google client's JavaS
 | Path | What's there |
 |---|---|
 | `src/lib/sheet-format.ts` | Reading and writing sheet rows. Columns are found by header, so they can move |
-| `src/lib/sheets.ts` | Google Sheets API calls, including the repricing window on the Summary tab |
-| `src/lib/sync.ts` | Sheet-to-database sync, price history, daily value snapshots |
+| `src/lib/sheets.ts` | Google Sheets API calls, including the settings on the Summary tab |
+| `src/lib/sync.ts` | Sheet-to-database sync, price history, daily value snapshots (also run every morning by `src/app/api/cron/sync`) |
+| `src/lib/collection.ts`, `src/lib/movers.ts` | Totals, gains, grading math, and biggest price changes |
+| `src/components/value-dashboard.tsx` | The Value page, shared with the demo |
+| `src/lib/demo-data.ts`, `src/app/demo/` | The public demo with sample data |
+| `src/lib/csv.ts` | CSV export |
 | `src/lib/item-sheet.ts` | Safe row writes that check the row first |
 | `src/lib/prices.ts` | Free card price lookups |
 | `src/lib/access.ts` | Owners, invites, and roles |
 | `src/lib/shares.ts`, `src/app/s/` | Share links and the public view-only pages |
-| `src/app/api/` | Sync, item edit/delete/reprice/price, settings, access requests, admin, account deletion, photo previews |
+| `src/app/api/` | Sync, daily sync, item edit/delete/reprice/price, settings, export, access requests, admin, account deletion, photo previews |
 | `supabase/migrations/` | Tables: items, photos, price_checks, value_snapshots, settings, google_tokens, members, access_requests, shares |
 | `claude/` | Setup prompt, Collection Intake page, and price check prompt |
-| `tests/` | Unit tests for row parsing, price lookups, access and share rules, and collection math |
+| `tests/` | Unit tests for row parsing, price lookups, access and share rules, collection math, and CSV export |
 
 ## Security
 
