@@ -71,7 +71,7 @@ export default async function SetupPage() {
       title: "Add your first item",
       done: (count ?? 0) > 0,
       body: (
-        <Link href="/add" className="text-sm">
+        <Link href="/scan" className="text-sm">
           Open the Add tab
         </Link>
       ),

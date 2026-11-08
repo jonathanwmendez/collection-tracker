@@ -2,7 +2,7 @@
 // sports cards from the printed back, and Magic, Pokémon, and Yu-Gi-Oh! from their card databases.
 // Nothing here calls Claude. Anything it can't identify is saved for the nightly run to look at.
 
-import { parseMagic, parsePokemon, parseSlab, parseSportsBack, parseYugioh, type OcrLine, type ScanKind } from "./card-text";
+import { detectKinds, parseMagic, parsePokemon, parseSlab, parseSportsBack, parseYugioh, type CardKind, type OcrLine, type ScanKind } from "./card-text";
 
 type Fetch = typeof fetch;
 
@@ -56,6 +56,26 @@ export async function identifyScan(input: ScanInput, f: Fetch = fetch): Promise<
     default:
       return [];
   }
+}
+
+/**
+ * Works out what kind of card it is from the text, then matches it. Tries the likeliest kind first and
+ * the next one if that finds nothing. With no clear signs, a card with a back photo is treated as a
+ * sports card (they're identified from the back); anything else is left for the nightly run.
+ */
+export async function identifyAuto(
+  input: { front: OcrLine[]; back: OcrLine[]; hasBack: boolean },
+  f: Fetch = fetch,
+): Promise<{ kind: CardKind | null; candidates: Candidate[] }> {
+  const scores = detectKinds([...input.front, ...input.back]);
+  const likely = scores.filter((s) => s.score >= 2).map((s) => s.kind);
+  const order: CardKind[] = likely.length ? likely.slice(0, 2) : input.hasBack ? ["sports"] : scores.slice(0, 1).map((s) => s.kind);
+  for (const [i, kind] of order.entries()) {
+    const candidates = await identifyScan({ kind, front: input.front, back: input.back }, f);
+    const unread = kind === "sports" && candidates.every((c) => c.name === "Unidentified card");
+    if (candidates.length && (!unread || i === order.length - 1)) return { kind, candidates };
+  }
+  return { kind: null, candidates: [] };
 }
 
 // ---------- sports cards ----------

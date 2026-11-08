@@ -22,5 +22,5 @@ export default async function ScanPage() {
       </div>
     );
   }
-  return <Scanner ebayOn={ebayConfigured()} />;
+  return <Scanner ebayOn={ebayConfigured()} intakeUrl={settings.intake_url} />;
 }

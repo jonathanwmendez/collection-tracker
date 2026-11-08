@@ -202,3 +202,67 @@ export function parseYugioh(lines: OcrLine[]): YugiohText {
   const name = (texts.find((t) => lettersShare(t) > 0.7 && t.replace(/[^A-Za-z]/g, "").length >= 3) ?? "").replace(/[^A-Za-z0-9 ,'’\-]/g, " ").replace(/\s+/g, " ").trim();
   return { name, setCode };
 }
+
+// ---------- what kind of card is this? ----------
+
+export type CardKind = "sports" | "magic" | "pokemon" | "yugioh";
+
+// Words and patterns printed on each kind of card (front or back). Each match adds to that kind's score.
+const SIGNS: Record<CardKind, RegExp[]> = {
+  pokemon: [
+    /\bhp\s?\d{2,3}\b|\b\d{2,3}\s?hp\b/i,
+    /\bweakness\b/i,
+    /\bresistance\b/i,
+    /\bretreat\b/i,
+    /pok[eé]mon/i,
+    /\bnintendo\b|creatures|game\s*freak/i,
+    /\b(basic|stage\s*[12]|evolves\s*from|trainer|supporter|energy)\b/i,
+    /\b\d{1,3}\s*\/\s*\d{2,3}\b/,
+  ],
+  magic: [
+    /wizards\s*of\s*the\s*coast|\bwotc\b/i,
+    /\billus\b/i,
+    /\b(creature|instant|sorcery|enchantment|artifact|planeswalker)\b/i,
+    /\blegendary\b|\bbasic\s*land\b|\btoken\b/i,
+    /\b[A-Z0-9]{3,5}\s*[•·*.]\s*EN\b/,
+    /deckmaster|magic\s*the\s*gathering/i,
+    /\b\d{1,4}\s*\/\s*\d{1,4}\s*[CURMLS]\b/,
+  ],
+  yugioh: [
+    /\bkonami\b/i,
+    /\batk\s*\/|\bdef\s*\//i,
+    /\[\s*(spell|trap)\s*card/i,
+    /\b(spell|trap)\s*card\b/i,
+    /\b[A-Z0-9]{2,4}\s*-\s*(EN|E|FR|DE|IT|SP|PT)?\s*\d{3}\b/,
+    /\b(fusion|synchro|xyz|link|ritual|pendulum|tuner|effect)\b.*\]/i,
+    /\b1st\s*edition\b|limited\s*edition/i,
+  ],
+  sports: [
+    new RegExp(BRANDS.map(([re]) => re.source).join("|"), "i"),
+    /\b(mlb|nba|nfl|nhl|mlbpa|nflpa|nbpa|nhlpa|major\s*league|national\s*football|national\s*basketball)\b/i,
+    /\b(bats|throws|born|ht|wt|height|weight|college|drafted|acquired)\b\s*:?/i,
+    /\b(avg|hr|rbi|era|whip|yds|td|int|rec|pts|reb|ast|stl|blk)\b.*\b(avg|hr|rbi|era|whip|yds|td|int|rec|pts|reb|ast|stl|blk)\b/i,
+    /\b(pitcher|catcher|infield|outfield|shortstop|quarterback|running\s*back|receiver|linebacker|guard|forward|center|goalie|defense)\b/i,
+    /\b(19[0-9]{2}|20[0-9]{2})\b.*\b(season|totals?|career)\b/i,
+  ],
+};
+
+/** Scores the text against each kind of card. Highest first; kinds with no signs are left out. */
+export function detectKinds(lines: OcrLine[]): Array<{ kind: CardKind; score: number }> {
+  const all = lines.map((l) => clean(l.text)).join("\n");
+  return (Object.keys(SIGNS) as CardKind[])
+    .map((kind) => ({ kind, score: SIGNS[kind].filter((re) => re.test(all)).length }))
+    .filter((k) => k.score > 0)
+    .sort((a, b) => b.score - a.score);
+}
+
+/**
+ * The kind of card, when the text makes it clear: at least 2 signs and ahead of the next kind.
+ * Pokémon, Magic, and Yu-Gi-Oh! are usually clear from the front alone; sports cards from the back.
+ */
+export function detectKind(lines: OcrLine[]): CardKind | null {
+  const [a, b] = detectKinds(lines);
+  if (!a || a.score < 2) return null;
+  if (b && b.score >= a.score) return null;
+  return a.kind;
+}
