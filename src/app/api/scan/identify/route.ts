@@ -25,7 +25,10 @@ export async function POST(request: Request) {
   const front = lines(body.front);
   const back = lines(body.back);
   // "auto" (the Scan page's default): work out what kind of card it is from the text.
-  if (body.kind === "auto") return NextResponse.json(await identifyAuto({ front, back, hasBack: Boolean(body.hasBack) }));
+  if (body.kind === "auto") {
+    const hint = (["sports", "magic", "pokemon", "yugioh"] as const).find((k) => k === body.hint) ?? null;
+    return NextResponse.json(await identifyAuto({ front, back, hasBack: Boolean(body.hasBack), hint }));
+  }
   const kind = KINDS.includes(body.kind as ScanKind) ? (body.kind as ScanKind) : "other";
   const candidates = await identifyScan({ kind, front, back });
   return NextResponse.json({ kind, candidates });

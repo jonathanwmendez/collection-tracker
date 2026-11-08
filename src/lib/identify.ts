@@ -64,12 +64,14 @@ export async function identifyScan(input: ScanInput, f: Fetch = fetch): Promise<
  * sports card (they're identified from the back); anything else is left for the nightly run.
  */
 export async function identifyAuto(
-  input: { front: OcrLine[]; back: OcrLine[]; hasBack: boolean },
+  input: { front: OcrLine[]; back: OcrLine[]; hasBack: boolean; hint?: CardKind | null },
   f: Fetch = fetch,
 ): Promise<{ kind: CardKind | null; candidates: Candidate[] }> {
   const scores = detectKinds([...input.front, ...input.back]);
   const likely = scores.filter((s) => s.score >= 2).map((s) => s.kind);
-  const order: CardKind[] = likely.length ? likely.slice(0, 2) : input.hasBack ? ["sports"] : scores.slice(0, 1).map((s) => s.kind);
+  // With no clear signs: what the Scan page's selector says, else a card with a back is a sports card.
+  const fallback: CardKind[] = input.hint ? [input.hint] : input.hasBack ? ["sports"] : scores.slice(0, 1).map((s) => s.kind);
+  const order: CardKind[] = likely.length ? likely.slice(0, 2) : fallback;
   for (const [i, kind] of order.entries()) {
     const candidates = await identifyScan({ kind, front: input.front, back: input.back }, f);
     const unread = kind === "sports" && candidates.every((c) => c.name === "Unidentified card");

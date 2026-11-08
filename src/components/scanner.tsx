@@ -24,6 +24,19 @@ const LABEL: Record<CardKind, string> = {
 };
 // Trading cards all have the same back, so they don't need one. Sports cards are read from the back.
 const NO_BACK_NEEDED: CardKind[] = ["magic", "pokemon", "yugioh"];
+// What's being scanned. "auto" until the first card is recognized; the selector follows each scan.
+type Mode = "auto" | CardKind | "item";
+const MODES: Array<{ value: Mode; label: string }> = [
+  { value: "auto", label: "Auto-detect" },
+  { value: "sports", label: "Sports" },
+  { value: "pokemon", label: "Pokémon" },
+  { value: "magic", label: "Magic" },
+  { value: "yugioh", label: "Yu-Gi-Oh!" },
+  { value: "item", label: "Other items" },
+];
+type Sides = "front" | "both";
+/** Sports cards are read from the back; trading cards and other items only need the front. */
+const sidesFor = (m: Mode): Sides => (m === "auto" || m === "sports" ? "both" : "front");
 // Scans saved by older versions of this page named their kind up front.
 const OLD_KIND: Record<string, CardKind> = {
   sports: "sports",
@@ -156,6 +169,8 @@ type Capture = {
   coa?: Blob;
   frontText?: OcrLine[];
   detected?: CardKind | null;
+  /** What the selector said when the front was taken. */
+  mode?: Mode;
 };
 
 export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: string | null }) {
@@ -163,8 +178,16 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
   const [location, setLocation] = useState("");
   const [editingLocation, setEditingLocation] = useState(false);
   const [auto, setAuto] = useState(true);
-  const [step, setStep] = useState<"front" | "back" | "coa">("front");
-  const [ready, setReady] = useState<Capture | null>(null);
+  const [step, setStep] = useState<"front" | "back">("front");
+  const [mode, setMode] = useState<Mode>("auto");
+  const [sides, setSides] = useState<Sides>("both");
+  const [torch, setTorch] = useState<"off" | "on" | "unsupported">("unsupported");
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+  const sidesRef = useRef(sides);
+  sidesRef.current = sides;
+  // When you set Front only / Front & back yourself, a recognized card doesn't change it back.
+  const sidesPicked = useRef(false);
   const [results, setResults] = useState<Result[]>([]);
   const [camError, setCamError] = useState("");
   const [flash, setFlash] = useState(false);
@@ -225,7 +248,7 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
               })
             : await api<{ kind: CardKind | null; candidates: Candidate[] }>("/api/scan/identify", {
                 method: "POST",
-                json: { kind: "auto", front, back, hasBack: Boolean(q.back) },
+                json: { kind: "auto", front, back, hasBack: Boolean(q.back), hint: q.detected ?? null },
               });
           if (!r.ok) {
             update(q.id, {
@@ -373,21 +396,21 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
     const c = card.current;
     if (!c.front) return;
     card.current = {};
-    setReady(null);
-    // A card (it has a back, or the front showed what card it is) keeps the area inside the frame;
-    // anything else keeps the whole picture.
-    const isCardScan = Boolean(c.back || c.detected);
+    // A card (it has a back, the front showed what card it is, or the selector says cards) keeps the area
+    // inside the frame; anything else keeps the whole picture.
+    const picked = c.mode && c.mode !== "auto" && c.mode !== "item" ? c.mode : null;
+    const isCardScan = Boolean(c.back || c.detected || picked);
     const q: QueuedScan = {
       id: crypto.randomUUID(),
       createdAt: Date.now(),
-      kind: "auto",
+      kind: c.mode === "item" && !c.detected ? "item:Other" : "auto",
       location: locationRef.current.trim(),
       condition: "",
       front: isCardScan ? c.front : (c.frontFull ?? c.front),
       back: c.back,
       coa: c.coa,
       frontText: isCardScan ? c.frontText : undefined,
-      detected: c.detected ?? null,
+      detected: c.detected ?? picked,
     };
     await putScan(q);
     setResults((rs) => [
@@ -403,22 +426,36 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
   }, [runQueue]);
 
   // Reads the front while you flip the card. A Pokémon, Magic, or Yu-Gi-Oh! card doesn't need its back.
-  const checkFront = useCallback((front: Blob) => {
-    void (async () => {
-      const lines = await readText(await shrink(front, OCR_PX, 0.9)).catch(() => [] as OcrLine[]);
-      if (card.current.front !== front) return; // already moved on
-      card.current.frontText = lines;
-      const kind = detectKind(lines);
-      card.current.detected = kind;
-      if (kind && NO_BACK_NEEDED.includes(kind) && stepRef.current === "back") {
-        setStep("front");
-        setReady({ ...card.current });
-        setHint(`${LABEL[kind]}. Next one.`);
-      } else if (kind && stepRef.current === "back") {
-        setHint(`${LABEL[kind]}. Now the back.`);
-      }
-    })();
+  // Switches what's being scanned, and the sides to match unless you set them yourself.
+  const applyMode = useCallback((m: Mode, byHand: boolean) => {
+    setMode(m);
+    if (byHand) sidesPicked.current = false;
+    if (!sidesPicked.current) setSides(sidesFor(m));
   }, []);
+
+  // Reads the front while you flip the card, and updates the selector to what it is.
+  // Pokémon, Magic, and Yu-Gi-Oh! don't need their back.
+  const checkFront = useCallback(
+    (front: Blob) => {
+      void (async () => {
+        const lines = await readText(await shrink(front, OCR_PX, 0.9)).catch(() => [] as OcrLine[]);
+        if (card.current.front !== front) return; // already moved on
+        card.current.frontText = lines;
+        const kind = detectKind(lines);
+        card.current.detected = kind;
+        if (!kind) return;
+        applyMode(kind, false);
+        if (stepRef.current !== "back") return;
+        if (NO_BACK_NEEDED.includes(kind) && !sidesPicked.current) {
+          setStep("front");
+          setHint(`${LABEL[kind]}. Next one.`);
+        } else {
+          setHint(`${LABEL[kind]}. Now the back.`);
+        }
+      })();
+    },
+    [applyMode],
+  );
 
   // ---------- camera ----------
 
@@ -431,30 +468,26 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
     setFlash(true);
     setTimeout(() => setFlash(false), 120);
     navigator.vibrate?.(30);
-    const current = stepRef.current;
-    if (current === "coa") {
-      card.current.coa = blob;
-      setReady({ ...card.current });
-      setStep("front");
-      setHint("Certificate added. Next item.");
-      return;
-    }
-    if (current === "front") {
+    if (stepRef.current === "front") {
       // A new front means the last item is done.
       if (card.current.front) await finishItem();
       card.current = {
         front: blob,
         frontFull: await frameToBlob(v, toVideo({ x: 0, y: 0, w: vw.sw, h: vw.sh }, v, vw), SAVE_PX),
+        mode: modeRef.current,
       };
-      setStep("back");
-      setHint("Flip it over");
+      if (sidesRef.current === "both") {
+        setStep("back");
+        setHint("Now the back");
+      } else {
+        setHint("Next one");
+      }
       checkFront(blob);
       return;
     }
     card.current.back = blob;
-    setReady({ ...card.current });
     setStep("front");
-    setHint("Next item, or add a certificate");
+    setHint("Next one");
   }, [finishItem, checkFront]);
 
   // Auto-snap: when the picture holds still for half a second and differs from the last photo.
@@ -531,6 +564,9 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
       setPhase("camera");
       setStep("front");
       setHint("Hold an item in the frame");
+      const track = s.getVideoTracks()[0];
+      const caps = (track?.getCapabilities?.() ?? {}) as { torch?: boolean };
+      setTorch(caps.torch ? "off" : "unsupported");
       wake.current =
         (await (navigator as Navigator & { wakeLock?: { request: (t: string) => Promise<{ release: () => Promise<void> }> } }).wakeLock
           ?.request("screen")
@@ -556,8 +592,31 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
     void start();
   }, [start]);
 
+  async function toggleTorch() {
+    const track = stream.current?.getVideoTracks()[0];
+    if (!track) return;
+    const on = torch !== "on";
+    try {
+      await track.applyConstraints({ advanced: [{ torch: on } as MediaTrackConstraintSet] });
+      setTorch(on ? "on" : "off");
+    } catch {
+      setTorch("unsupported");
+    }
+  }
+
+  // Front only / Front & back. Choosing Front only while it waits for a back finishes that item without one.
+  function chooseSides(next: Sides) {
+    sidesPicked.current = true;
+    setSides(next);
+    if (next === "front" && stepRef.current === "back") {
+      setStep("front");
+      setHint("Next one");
+    }
+  }
+
   async function stop() {
     if (card.current.front) await finishItem();
+    setTorch("unsupported");
     stream.current?.getTracks().forEach((t) => t.stop());
     stream.current = null;
     await wake.current?.release().catch(() => {});
@@ -670,9 +729,10 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
 
   // ---------- camera ----------
 
-  const prompt = step === "coa" ? "Hold the certificate in the frame" : step === "back" ? hint || "Flip it over" : hint || "Hold an item in the frame";
+  const prompt = step === "back" ? hint || "Now the back" : hint || "Hold an item in the frame";
   const chip = "min-h-9 shrink-0 rounded-full bg-black/50 px-3 text-xs font-medium backdrop-blur";
   const big = "min-h-11 min-w-24 rounded-full bg-black/50 px-4 text-sm font-medium backdrop-blur";
+  const segment = (on: boolean) => `min-h-9 flex-1 rounded-full px-3 text-sm font-medium ${on ? "bg-white text-black" : "text-white"}`;
   return (
     <div ref={stage} className="fixed inset-x-0 z-30 overflow-hidden bg-black text-white" style={{ top: frame.top, bottom: frame.bottom }}>
       <video ref={video} playsInline muted autoPlay className="absolute inset-0 h-full w-full object-cover" />
@@ -701,12 +761,35 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
           </form>
         ) : (
           <>
-            <button type="button" onClick={() => setEditingLocation(true)} className={`${chip} truncate max-w-[55%]`}>
-              {location ? `Location: ${location}` : "Set location"}
-            </button>
-            <button type="button" onClick={() => setAuto((a) => !a)} aria-pressed={auto} className={chip}>
-              Auto snap {auto ? "on" : "off"}
-            </button>
+            <div className="flex min-w-0 flex-1 basis-0">
+              <button type="button" onClick={() => setEditingLocation(true)} className={`${chip} max-w-full truncate`}>
+                {location ? location : "Set location"}
+              </button>
+            </div>
+            <label className="relative shrink-0">
+              <span className="sr-only">What you&apos;re scanning</span>
+              <select
+                value={mode}
+                onChange={(e) => applyMode(e.target.value as Mode, true)}
+                className="min-h-10 appearance-none rounded-full bg-black/60 pl-4 pr-9 text-base font-bold text-white backdrop-blur"
+              >
+                {MODES.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+              <span aria-hidden className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-xs">
+                ▼
+              </span>
+            </label>
+            <div className="flex flex-1 basis-0 justify-end">
+              {torch !== "unsupported" && (
+                <button type="button" onClick={toggleTorch} aria-pressed={torch === "on"} className={`${chip} ${torch === "on" ? "bg-white text-black" : ""}`}>
+                  Flash {torch === "on" ? "on" : "off"}
+                </button>
+              )}
+            </div>
           </>
         )}
       </div>
@@ -721,6 +804,14 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
         ref={bottomBar}
         className="absolute inset-x-0 bottom-0 px-4 pt-6 pb-3 flex flex-col gap-3 bg-gradient-to-t from-black/75 via-black/45 to-transparent"
       >
+        <div role="group" aria-label="Photos of each item" className="mx-auto flex w-full max-w-xs gap-1 rounded-full bg-black/50 p-1 backdrop-blur">
+          <button type="button" aria-pressed={sides === "front"} onClick={() => chooseSides("front")} className={segment(sides === "front")}>
+            Front only
+          </button>
+          <button type="button" aria-pressed={sides === "both"} onClick={() => chooseSides("both")} className={segment(sides === "both")}>
+            Front &amp; back
+          </button>
+        </div>
         <p className="text-center text-xs tabular-nums text-white/80">
           {counts.saved} saved
           {counts.working ? ` · ${counts.working} working` : ""}
@@ -741,16 +832,15 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
               type="button"
               onClick={() => {
                 setStep("front");
-                setReady({ ...card.current });
-                setHint("Next item, or add a certificate");
+                setHint("No back. Next one.");
               }}
               className={big}
             >
-              No back
+              Skip back
             </button>
           ) : (
-            <button type="button" disabled={!ready?.front || !!ready?.coa} onClick={() => setStep("coa")} className={`${big} disabled:opacity-40`}>
-              Certificate
+            <button type="button" onClick={() => setAuto((a) => !a)} aria-pressed={auto} className={big}>
+              Auto snap {auto ? "on" : "off"}
             </button>
           )}
         </div>
