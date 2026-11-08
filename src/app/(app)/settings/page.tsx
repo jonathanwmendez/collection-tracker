@@ -67,8 +67,7 @@ export default async function SettingsPage() {
           Signed in as <span className="font-medium">{user?.email}</span>
         </p>
         <p className="text-sm text-muted">
-          While the app is in Google&apos;s Testing mode, Google ends its access 7 days after you sign in. When that happens, the app asks you to sign in
-          again.
+          If Google ends the app&apos;s access (for example, every 7 days while the Google app is in Testing), the app asks you to sign in again.
         </p>
         <form action="/auth/signout" method="post">
           <button type="submit" className="min-h-11 rounded-xl border border-line bg-surface px-4 font-medium">

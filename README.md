@@ -12,23 +12,26 @@ A phone-first web app for cataloging and valuing collectibles: sports cards, Mag
 
 ## How it works
 
-A Google Sheet is the main copy of the collection. Three pieces work on it:
+A Google Sheet is the main copy of the collection. Four pieces work on it:
 
 | Piece | Runs on | What it does |
 |---|---|---|
-| **Collection Intake** | A Claude artifact | Take photos (or pick them from your library) and you're done. They upload to a Drive inbox. No Claude usage |
-| **Background task** | A Claude scheduled task, nightly at 3:30 AM | Identifies new photos (pairs card fronts with backs, splits binder pages), checks for duplicates, saves each item to the sheet with a "Check this" note when unsure, and then prices it from recent sold listings. It also rechecks prices older than the repricing window (30 days by default) until 8:00 AM, adds PSA 9 and PSA 10 prices for ungraded cards, emails alerts for big moves, and logs each run with tokens used to a Price Log tab |
-| **This web app** | Vercel + Supabase | Syncs from the sheet every morning and whenever you open it, to browse, search, edit, analyze, and share the collection |
+| **Scan page** | This web app, on your phone | Point the camera at a card: it snaps the front, back, and any certificate on its own, reads the text on the phone, and shows the top 3 matches. Pick one, set the condition and location, and it's saved to the sheet with a free price. Works offline and catches up when the signal returns. No Claude usage |
+| **Collection Intake** | A Claude artifact | For anything that isn't a card: take photos and you're done. They upload to a Drive inbox. No Claude usage |
+| **Morning pricing** | This web app, daily at 9 AM | Free prices, no Claude: Magic, Pokémon, and Yu-Gi-Oh! from their card databases every day, and sports cards from current eBay listings (labeled "asking") once they're due |
+| **Background task** | A Claude scheduled task, nightly at 3:30 AM | Identifies Intake photos and scans the app couldn't read, prices from recent sold listings (everything that isn't a card, plus cards worth at least the "Claude Check Over" amount, $10 by default), checks certificates, samples the free prices for accuracy on Sundays, adds PSA 9 and PSA 10 prices, emails alerts for big moves, and logs each run to a Price Log tab. Stops starting new items at 8:00 AM |
 
-Identifying and pricing run inside Claude, on a Claude subscription. The web app makes no paid AI calls.
+The app makes no paid AI calls. Only the background task uses a Claude subscription, and only overnight.
 
 **App features:**
 - Collection: search, category lists with filters, item pages with full-screen photos (cards show front and back) and price history, and a list of items Claude flagged to check
+- Location (which box or binder), certificates of authenticity with a lookup link, and a Sets & Sealed tab for factory-sealed products
+- Add a back or certificate photo later from the item page
 - Editing saved to the sheet (each write checks it still has the right row), delete, queue for repricing, add without a photo with a duplicate check
 - Profit tracking: what you paid, what you sold for, gain so far, and realized profit
-- Value dashboard: total over time (snapshot every morning), change by category, biggest price moves, grading candidates, price upkeep, CSV export
-- Free card prices for Magic, Pokémon, and Yu-Gi-Oh! (Scryfall, Pokémon TCG API, YGOPRODeck)
-- Settings kept the same in the app and the sheet: repricing window, alert threshold, grading cost
+- Value dashboard: total over time (snapshot every morning), change by category, biggest price moves, grading candidates, price upkeep, CSV export, and a printable insurance report
+- Free card prices for Magic, Pokémon, and Yu-Gi-Oh! (Scryfall, Pokémon TCG API, YGOPRODeck), and eBay asking prices for sports cards (eBay Browse API)
+- Settings kept the same in the app and the sheet: repricing window, alert threshold, grading cost, Claude check amount
 - Invite-only accounts with an Admin page and a setup checklist for each new person, and view-only share links
 
 **Built with:** Next.js 15, TypeScript, Tailwind CSS, Supabase (Postgres, Auth, Storage), Google Sheets and Drive APIs, Vercel.
@@ -37,7 +40,7 @@ Identifying and pricing run inside Claude, on a Claude subscription. The web app
 
 About 30 minutes. Do the steps in order: each one uses an address from the one before. Checked against each service in November 2026.
 
-**You need:** a Google account, a GitHub account, free Supabase and Vercel accounts, and a Claude plan with scheduled tasks and artifacts. In Claude (**Settings > Connectors**), connect:
+**You need:** a Google account, a GitHub account, free Supabase and Vercel accounts, and a Claude plan with scheduled tasks and artifacts. Optional: a free [eBay developer account](https://developer.ebay.com) for sports card asking prices. In Claude (**Settings > Connectors**), connect:
 
 | Connector | Used by | For |
 |---|---|---|
@@ -65,11 +68,12 @@ If Claude did this in step 1, skip to step 4. You still need the client secret y
 
 1. In [Google Cloud Console](https://console.cloud.google.com), create a project and enable the **Google Sheets API** and **Google Drive API**.
 2. **Google Auth Platform > Get started:** app name, support email, audience **External**, contact email.
-3. **Audience > Test users:** add your Google account. Leave the status on **Testing**.
-4. **Data access > Add or remove scopes > Manually add scopes:** paste the two scopes below, then **Add to table**, **Update**, **Save**.
+3. **Audience > Test users:** add your Google account. Then **Publish app** so the status is **In production**. Don't submit for verification. In production, Google stops signing you out every 7 days.
+4. **Data access > Add or remove scopes > Manually add scopes:** paste the three scopes below, then **Add to table**, **Update**, **Save**.
    ```
    https://www.googleapis.com/auth/spreadsheets
    https://www.googleapis.com/auth/drive.readonly
+   https://www.googleapis.com/auth/drive.file
    ```
 5. **Clients > Create client**, type **Web application**. Leave the origins for now. Under **Authorized redirect URIs**, add `https://<project-ref>.supabase.co/auth/v1/callback` (your Supabase URL plus `/auth/v1/callback`). Copy the client ID and secret. Google may show the secret only once.
 
@@ -89,6 +93,7 @@ If Claude did this in step 1, skip to step 4. You still need the client secret y
 | `GOOGLE_CLIENT_SECRET` | Google client secret |
 | `CRON_SECRET` | A long random string. Vercel sends it to the daily sync so only Vercel can run it |
 | `POKEMONTCG_API_KEY` | Optional, raises the Pokémon price lookup limit ([pokemontcg.io](https://pokemontcg.io)) |
+| `EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET` | Optional, turns on sports card asking prices. From your eBay developer account's Production keyset: App ID and Cert ID |
 
 If you change a variable later, redeploy for it to take effect.
 
@@ -113,7 +118,7 @@ Everyone uses their own Google account and their own Claude plan. Their data sta
 
 The Admin page shows each person's progress (signed in, Google, sheet, Intake, synced) and lets you make admins or remove access. Anyone can delete their own account and app data from Settings.
 
-**About Testing mode:** up to 100 test users can sign in, and Google asks everyone to sign in again every 7 days. Publishing the app removes both limits, but Google requires a verified domain with a privacy policy and terms, plus a review of both scopes, including a yearly third-party security assessment for `drive.readonly`.
+**About Google's limits:** an unverified app in production can have up to 100 users, and they see "Google hasn't verified this app" when signing in. Verifying removes both, but Google requires a verified domain with a privacy policy and terms, plus a review of the scopes, including a yearly third-party security assessment for `drive.readonly`.
 
 ## Sharing
 
@@ -128,6 +133,8 @@ npm run dev                  # http://localhost:3000
 npm test
 ```
 
+`npm run dev` and `npm run build` first copy the on-phone text reader (tesseract.js) into `public/tesseract/`, which is not committed.
+
 For local sign-in, also add `http://localhost:3000` to the Google client's JavaScript origins and `http://localhost:3000/**` to Supabase's redirect URLs.
 
 | Path | What's there |
@@ -140,14 +147,17 @@ For local sign-in, also add `http://localhost:3000` to the Google client's JavaS
 | `src/lib/demo-data.ts`, `src/app/demo/` | The public demo with sample data |
 | `src/lib/csv.ts` | CSV export |
 | `src/lib/item-sheet.ts` | Safe row writes that check the row first |
-| `src/lib/prices.ts` | Free card price lookups |
+| `src/lib/prices.ts`, `src/lib/ebay.ts` | Free card price lookups and eBay asking prices |
+| `src/lib/reprice.ts`, `src/lib/reprice-rules.ts` | Morning free repricing and which items it covers |
+| `src/components/scanner.tsx`, `src/lib/card-text.ts`, `src/lib/identify.ts`, `src/lib/scan.ts` | Scan page: camera, reading card text, matching, and saving |
+| `src/lib/paged.ts` | Reads past Supabase's 1,000-row limit |
 | `src/lib/access.ts` | Owners, invites, and roles |
 | `src/lib/shares.ts`, `src/app/s/` | Share links and the public view-only pages |
-| `src/app/api/` | Sync, daily sync, item edit/delete/reprice/price, settings, export, access requests, admin, account deletion, photo previews |
+| `src/app/api/` | Sync, daily sync and pricing, scanning, item edit/delete/reprice/price/photos, settings, export, access requests, admin, account deletion, photo previews |
 | `supabase/migrations/` | Tables: items, photos, price_checks, value_snapshots, settings, google_tokens, members, access_requests, shares |
 | `claude/` | Setup prompt, Collection Intake page, and the background task prompt (`price-check.md`) |
 | `vercel.json` | Daily sync schedule, and a redirect from this deployment's old address (safe to remove in a fork) |
-| `tests/` | Unit tests for row parsing, price lookups, access and share rules, collection math, and CSV export |
+| `tests/` | Unit tests for row parsing, card text, price lookups, repricing rules, access and share rules, collection math, and CSV export |
 
 ## Security
 
@@ -155,4 +165,4 @@ For local sign-in, also add `http://localhost:3000` to the Google client's JavaS
 - Invites and access requests live in tables only the server can read.
 - Share links use random 128-bit tokens, are checked on every request, and only serve the categories and fields the link allows. Share pages are hidden from search engines.
 - Google refresh tokens live in a table only the server can read.
-- Google access: the app asks to edit sheets and view Drive files. It only opens the connected sheet and the photos it links to, and never deletes anything in Drive. Deleting your account also revokes the app's Google access.
+- Google access: the app asks to edit sheets, view Drive files, and create files in folders it makes itself (the "Collection Tracker Scans" folder). It only opens the connected sheet and the photos it links to, and never deletes anything in Drive. Deleting your account also revokes the app's Google access.

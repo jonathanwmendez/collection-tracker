@@ -49,7 +49,7 @@ export async function GET(request: Request) {
       }
       results.push({ user: user_id, ok: true, items: r.items, priced });
     } catch (e) {
-      // Usually an expired Google sign-in (Testing mode ends access after 7 days). The app asks them to sign in again.
+      // Usually an expired Google sign-in. The app asks them to sign in again.
       results.push({ user: user_id, ok: false, error: e instanceof GoogleError || e instanceof Error ? e.message : "Sync failed" });
     }
   }
