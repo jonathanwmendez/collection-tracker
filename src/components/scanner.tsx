@@ -37,21 +37,35 @@ const OLD_KIND: Record<string, CardKind> = {
 const SAVE_PX = 1600;
 const OCR_PX = 2000;
 
-/** The card-shaped area in the middle of the frame (5:7, like a card; a little taller for slabs). */
-function cropRect(w: number, h: number, card: boolean) {
-  if (!card) return { x: 0, y: 0, w, h };
-  let gw = w * 0.86;
+type Rect = { x: number; y: number; w: number; h: number };
+/** The camera screen: its size, and the space the top and bottom controls cover. */
+type View = { sw: number; sh: number; top: number; bottom: number };
+
+/** The card frame on screen (2:3, like a card; a little taller for slabs), centered between the controls. */
+function guideRect(v: View): Rect {
+  const bh = Math.max(1, v.sh - v.top - v.bottom);
+  let gw = v.sw * 0.86;
   let gh = gw * 1.5;
-  if (gh > h * 0.94) {
-    gh = h * 0.94;
+  if (gh > bh * 0.94) {
+    gh = bh * 0.94;
     gw = gh / 1.5;
   }
-  return { x: (w - gw) / 2, y: (h - gh) / 2, w: gw, h: gh };
+  return { x: (v.sw - gw) / 2, y: v.top + (bh - gh) / 2, w: gw, h: gh };
 }
 
-async function frameToBlob(video: HTMLVideoElement, card: boolean, maxPx: number, quality = 0.82): Promise<Blob> {
-  // card: only the area inside the frame; otherwise the whole picture.
-  const r = cropRect(video.videoWidth, video.videoHeight, card);
+/** The video fills the screen and its edges are cut off (object-cover). This maps a rectangle on screen to the video. */
+function toVideo(r: Rect, video: HTMLVideoElement, v: View): Rect {
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+  const k = Math.max(v.sw / vw, v.sh / vh);
+  const ox = (v.sw - vw * k) / 2;
+  const oy = (v.sh - vh * k) / 2;
+  const x = Math.max(0, (r.x - ox) / k);
+  const y = Math.max(0, (r.y - oy) / k);
+  return { x, y, w: Math.min(vw - x, r.w / k), h: Math.min(vh - y, r.h / k) };
+}
+
+async function frameToBlob(video: HTMLVideoElement, r: Rect, maxPx: number, quality = 0.82): Promise<Blob> {
   const k = Math.min(1, maxPx / Math.max(r.w, r.h));
   const c = document.createElement("canvas");
   c.width = Math.round(r.w * k);
@@ -155,9 +169,14 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
   const [camError, setCamError] = useState("");
   const [flash, setFlash] = useState(false);
   const [hint, setHint] = useState("");
-  const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
-  const [box, setBox] = useState<{ w: number; h: number } | null>(null);
+  const [view, setView] = useState<View | null>(null);
+  const viewRef = useRef<View | null>(null);
+  viewRef.current = view;
+  // Where the camera screen sits: above the bottom menu on phones, below the header on larger screens.
+  const [frame, setFrame] = useState<{ top: number; bottom: number }>({ top: 0, bottom: 0 });
   const stage = useRef<HTMLDivElement>(null);
+  const topBar = useRef<HTMLDivElement>(null);
+  const bottomBar = useRef<HTMLDivElement>(null);
 
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
@@ -406,7 +425,9 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
   const capture = useCallback(async () => {
     const v = video.current;
     if (!v || !v.videoWidth) return;
-    const blob = await frameToBlob(v, true, SAVE_PX);
+    const vw = viewRef.current;
+    if (!vw) return;
+    const blob = await frameToBlob(v, toVideo(guideRect(vw), v, vw), SAVE_PX);
     setFlash(true);
     setTimeout(() => setFlash(false), 120);
     navigator.vibrate?.(30);
@@ -423,7 +444,7 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
       if (card.current.front) await finishItem();
       card.current = {
         front: blob,
-        frontFull: await frameToBlob(v, false, SAVE_PX),
+        frontFull: await frameToBlob(v, toVideo({ x: 0, y: 0, w: vw.sw, h: vw.sh }, v, vw), SAVE_PX),
       };
       setStep("back");
       setHint("Flip it over");
@@ -450,7 +471,9 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
     const sample = () => {
       const v = video.current;
       if (!v || !v.videoWidth) return null;
-      const r = cropRect(v.videoWidth, v.videoHeight, true);
+      const vw = viewRef.current;
+      if (!vw) return null;
+      const r = toVideo(guideRect(vw), v, vw);
       c.width = W;
       c.height = Math.round((W * r.h) / r.w);
       ctx.drawImage(v, r.x, r.y, r.w, r.h, 0, 0, c.width, c.height);
@@ -542,28 +565,39 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
     setPhase("review");
   }
 
-  // Turn the camera off when leaving the page.
+  // Leaving the page (say, for another tab in the menu): keep the item in progress and turn the camera off.
+  const finishRef = useRef(finishItem);
+  finishRef.current = finishItem;
   useEffect(
     () => () => {
+      if (card.current.front) void finishRef.current();
       stream.current?.getTracks().forEach((t) => t.stop());
       stream.current = null;
     },
     [],
   );
 
-  // Size the photo area to the camera's shape, so the frame on screen matches what's saved.
+  // Measure the camera screen and its controls, so the frame on screen matches what's saved.
   useEffect(() => {
-    const el = stage.current;
-    if (!el || !dims) return;
-    const fit = () => {
-      const k = Math.min(el.clientWidth / dims.w, el.clientHeight / dims.h);
-      setBox({ w: Math.floor(dims.w * k), h: Math.floor(dims.h * k) });
+    if (phase !== "camera") return;
+    const place = () => {
+      // Height of an element that's showing (0 when hidden with display: none, as the menu is on large screens).
+      const height = (sel: string) => document.querySelector(sel)?.getBoundingClientRect().height ?? 0;
+      const wide = window.matchMedia("(min-width: 768px)").matches;
+      setFrame({ top: wide ? height("[data-app-header]") : 0, bottom: height("[data-bottom-nav]") });
+      const el = stage.current;
+      if (!el) return;
+      setView({ sw: el.clientWidth, sh: el.clientHeight, top: (topBar.current?.offsetHeight ?? 0) + 44, bottom: bottomBar.current?.offsetHeight ?? 0 });
     };
-    fit();
-    const ro = new ResizeObserver(fit);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [dims, phase]);
+    place();
+    const ro = new ResizeObserver(place);
+    [stage.current, topBar.current, bottomBar.current].forEach((el) => el && ro.observe(el));
+    window.addEventListener("resize", place);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", place);
+    };
+  }, [phase]);
 
   async function pick(r: Result, c: Candidate | null) {
     const q = (await pendingScans()).find((x) => x.id === r.id);
@@ -637,10 +671,14 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
   // ---------- camera ----------
 
   const prompt = step === "coa" ? "Hold the certificate in the frame" : step === "back" ? hint || "Flip it over" : hint || "Hold an item in the frame";
-  const chip = "min-h-9 shrink-0 rounded-full bg-white/15 px-3 text-xs font-medium";
+  const chip = "min-h-9 shrink-0 rounded-full bg-black/50 px-3 text-xs font-medium backdrop-blur";
+  const big = "min-h-11 min-w-24 rounded-full bg-black/50 px-4 text-sm font-medium backdrop-blur";
   return (
-    <div className="fixed inset-0 z-40 bg-black text-white flex flex-col">
-      <div className="flex items-center justify-between gap-2 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-2 text-sm">
+    <div ref={stage} className="fixed inset-x-0 z-30 overflow-hidden bg-black text-white" style={{ top: frame.top, bottom: frame.bottom }}>
+      <video ref={video} playsInline muted autoPlay className="absolute inset-0 h-full w-full object-cover" />
+      {view && <Guide rect={guideRect(view)} />}
+      {flash && <div className="absolute inset-0 bg-white/70" />}
+      <div ref={topBar} className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-2 text-sm">
         {editingLocation ? (
           <form
             className="flex flex-1 gap-2"
@@ -655,7 +693,7 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               placeholder="Box 12, Binder 3…"
-              className="min-h-9 flex-1 min-w-0 rounded-full bg-white/15 px-3 text-base text-white placeholder:text-white/50"
+              className="min-h-9 flex-1 min-w-0 rounded-full bg-black/50 px-3 text-base text-white placeholder:text-white/50 backdrop-blur"
             />
             <button type="submit" className={chip}>
               Done
@@ -672,43 +710,31 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
           </>
         )}
       </div>
-      <div ref={stage} className="relative flex-1 min-h-0 flex items-center justify-center overflow-hidden">
-        <div className="relative" style={box ? { width: box.w, height: box.h } : { width: "100%", height: "100%" }}>
-          <video
-            ref={video}
-            playsInline
-            muted
-            autoPlay
-            onLoadedMetadata={(e) =>
-              setDims({
-                w: e.currentTarget.videoWidth,
-                h: e.currentTarget.videoHeight,
-              })
-            }
-            className="absolute inset-0 h-full w-full object-fill"
-          />
-          {box && <Guide w={box.w} h={box.h} />}
-          {flash && <div className="absolute inset-0 bg-white/70" />}
-        </div>
-        <p className="absolute top-3 inset-x-0 text-center text-lg font-medium drop-shadow" aria-live="polite">
-          {prompt}
-        </p>
-      </div>
-      <div className="px-4 pt-3 pb-[max(16px,env(safe-area-inset-bottom))] flex flex-col gap-3 bg-black">
-        <p className="text-center text-xs tabular-nums text-white/70">
+      <p
+        className="absolute inset-x-0 px-4 text-center text-lg font-medium [text-shadow:0_1px_4px_rgba(0,0,0,0.8)]"
+        style={{ top: view ? view.top - 40 : 60 }}
+        aria-live="polite"
+      >
+        {prompt}
+      </p>
+      <div
+        ref={bottomBar}
+        className="absolute inset-x-0 bottom-0 px-4 pt-6 pb-3 flex flex-col gap-3 bg-gradient-to-t from-black/75 via-black/45 to-transparent"
+      >
+        <p className="text-center text-xs tabular-nums text-white/80">
           {counts.saved} saved
           {counts.working ? ` · ${counts.working} working` : ""}
           {counts.attention ? ` · ${counts.attention} to check` : ""}
         </p>
         <div className="flex items-center justify-between gap-3">
-          <button type="button" onClick={stop} className="min-h-11 rounded-full bg-white/15 px-5 text-sm font-medium">
+          <button type="button" onClick={stop} className={big}>
             Done
           </button>
           <button
             type="button"
             onClick={capture}
             aria-label="Take photo"
-            className="h-16 w-16 rounded-full border-4 border-white bg-white/20 active:bg-white/60"
+            className="h-16 w-16 rounded-full border-4 border-white bg-white/25 active:bg-white/60"
           />
           {step === "back" ? (
             <button
@@ -718,17 +744,12 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
                 setReady({ ...card.current });
                 setHint("Next item, or add a certificate");
               }}
-              className="min-h-11 rounded-full bg-white/15 px-4 text-sm font-medium"
+              className={big}
             >
               No back
             </button>
           ) : (
-            <button
-              type="button"
-              disabled={!ready?.front || !!ready?.coa}
-              onClick={() => setStep("coa")}
-              className="min-h-11 rounded-full bg-white/15 px-4 text-sm font-medium disabled:opacity-40"
-            >
+            <button type="button" disabled={!ready?.front || !!ready?.coa} onClick={() => setStep("coa")} className={`${big} disabled:opacity-40`}>
               Certificate
             </button>
           )}
@@ -751,13 +772,12 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
   );
 }
 
-/** The card frame on screen, the same area that's saved (see cropRect). */
-function Guide({ w, h }: { w: number; h: number }) {
-  const r = cropRect(w, h, true);
+/** The card frame on screen, the same area that's saved (see guideRect and toVideo). */
+function Guide({ rect: r }: { rect: Rect }) {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
       <div
-        className="absolute rounded-xl border-2 border-white/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]"
+        className="absolute rounded-xl border-2 border-white/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.25)]"
         style={{ left: r.x, top: r.y, width: r.w, height: r.h }}
       />
     </div>
