@@ -61,18 +61,20 @@ const SHAPE_LABEL: Record<Shape, string> = { card: "Card", sideways: "Sideways c
 // Height divided by width.
 const RATIO: Record<Exclude<Shape, "full">, number> = { card: 1.4, sideways: 1 / 1.4, slab: 1.7 };
 
-/** The frame on screen, centered between the controls. */
+/** The frame on screen, centered on the screen and clear of the top buttons and the shutter. */
 function guideRect(v: View, shape: Shape = "card"): Rect {
-  const bh = Math.max(1, v.sh - v.top - v.bottom);
-  if (shape === "full") return { x: v.sw * 0.04, y: v.top, w: v.sw * 0.92, h: bh * 0.98 };
+  const cy = v.sh / 2;
+  // As tall as fits on both sides of the middle.
+  const maxH = Math.max(1, 2 * Math.min(cy - v.top, v.sh - v.bottom - cy));
+  if (shape === "full") return { x: v.sw * 0.04, y: cy - maxH / 2, w: v.sw * 0.92, h: maxH };
   const ratio = RATIO[shape];
   let gw = v.sw * (shape === "sideways" ? 0.92 : 0.86);
   let gh = gw * ratio;
-  if (gh > bh * 0.94) {
-    gh = bh * 0.94;
+  if (gh > maxH) {
+    gh = maxH;
     gw = gh / ratio;
   }
-  return { x: (v.sw - gw) / 2, y: v.top + (bh - gh) / 2, w: gw, h: gh };
+  return { x: (v.sw - gw) / 2, y: cy - gh / 2, w: gw, h: gh };
 }
 
 /**
@@ -256,6 +258,7 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
   const stage = useRef<HTMLDivElement>(null);
   const topBar = useRef<HTMLDivElement>(null);
   const bottomBar = useRef<HTMLDivElement>(null);
+  const shutterRow = useRef<HTMLDivElement>(null);
 
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
@@ -818,11 +821,13 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
       setFrame({ top: wide ? height("[data-app-header]") : 0, bottom: height("[data-bottom-nav]") });
       const el = stage.current;
       if (!el) return;
-      setView({ sw: el.clientWidth, sh: el.clientHeight, top: (topBar.current?.offsetHeight ?? 0) + 44, bottom: bottomBar.current?.offsetHeight ?? 0 });
+      // The frame is centered on the screen, clear of the top buttons and the shutter row. The prompt, Retake,
+      // and the result card float over the picture.
+      setView({ sw: el.clientWidth, sh: el.clientHeight, top: (topBar.current?.offsetHeight ?? 0) + 8, bottom: (shutterRow.current?.offsetHeight ?? 0) + 20 });
     };
     place();
     const ro = new ResizeObserver(place);
-    [stage.current, topBar.current, bottomBar.current].forEach((el) => el && ro.observe(el));
+    [stage.current, topBar.current, bottomBar.current, shutterRow.current].forEach((el) => el && ro.observe(el));
     window.addEventListener("resize", place);
     return () => {
       ro.disconnect();
@@ -914,11 +919,18 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
       {flash && <div className="absolute inset-0 bg-white/70" />}
       <div ref={topBar} className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-2">
         <div className="flex flex-1 basis-0 gap-2">
-          <button type="button" onClick={toggleAuto} aria-pressed={auto} aria-label={auto ? "Auto snap is on" : "Auto snap is off"} className={round}>
-            <AutoSnapIcon off={!auto} />
-          </button>
-          <button type="button" onClick={nextShape} aria-label={`Frame: ${SHAPE_LABEL[shape]}. Tap to change.`} className={round}>
-            <ShapeIcon shape={shape} />
+          <button
+            type="button"
+            role="switch"
+            onClick={toggleAuto}
+            aria-checked={auto}
+            aria-label="Take photos automatically"
+            className={`flex h-11 items-center gap-2 rounded-full pl-3 pr-1.5 text-sm font-bold backdrop-blur ${auto ? "bg-ok text-white" : "bg-black/50 text-white/80"}`}
+          >
+            Auto
+            <span className={`relative h-6 w-10 rounded-full transition-colors ${auto ? "bg-white/35" : "bg-white/20"}`}>
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-[left] ${auto ? "left-[18px]" : "left-0.5"}`} />
+            </span>
           </button>
         </div>
         <label className="relative shrink-0">
@@ -938,7 +950,10 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
             ▼
           </span>
         </label>
-        <div className="flex flex-1 basis-0 justify-end">
+        <div className="flex flex-1 basis-0 justify-end gap-2">
+          <button type="button" onClick={nextShape} aria-label={`Frame: ${SHAPE_LABEL[shape]}. Tap to change.`} className={round}>
+            <ShapeIcon shape={shape} />
+          </button>
           {torch !== "unsupported" && (
             <button
               type="button"
@@ -954,7 +969,7 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
       </div>
       <p
         className="absolute inset-x-0 px-4 text-center text-lg font-medium [text-shadow:0_1px_4px_rgba(0,0,0,0.8)]"
-        style={{ top: view ? view.top - 40 : 60 }}
+        style={{ top: view ? view.top + 4 : 64 }}
         aria-live="polite"
       >
         {prompt}
@@ -1030,7 +1045,7 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
             </button>
           )}
         </div>
-        <div className="grid grid-cols-3 items-center">
+        <div ref={shutterRow} className="grid grid-cols-3 items-center">
           <button
             type="button"
             onClick={() => setSettingsOpen(true)}
@@ -1058,9 +1073,10 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
               if (stepRef.current !== "back") setHint(next === "both" ? "Front and back of each item" : "Front only");
             }}
             aria-label={sides === "both" ? "Taking the front and back. Tap for front only." : "Taking the front only. Tap for front and back."}
-            className={`${round} justify-self-end`}
+            className="flex h-11 items-center gap-1.5 justify-self-end rounded-full bg-black/50 px-3 text-xs font-bold backdrop-blur"
           >
             <SidesIcon both={sides === "both"} />
+            {sides === "both" ? "Front + back" : "Front only"}
           </button>
         </div>
       </div>
@@ -1102,9 +1118,6 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
                 </p>
               )}
             </div>
-            <button type="button" onClick={() => setPanel(null)} className="min-h-12 rounded-full bg-navy px-5 text-base font-medium text-navy-ink">
-              Back to camera
-            </button>
           </div>
           <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4 py-4">
             <label className="flex flex-col gap-1.5 text-base font-medium">
@@ -1148,6 +1161,17 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
               )}
             </div>
           </div>
+          {/* Where your thumb is after tapping the gear. */}
+          <div className="border-t border-line bg-surface px-4 py-3">
+            <button
+              type="button"
+              onClick={() => setPanel(null)}
+              className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-navy text-base font-bold text-navy-ink"
+            >
+              <CameraIcon />
+              Back to camera
+            </button>
+          </div>
         </div>
       )}
 
@@ -1189,17 +1213,6 @@ function FlashIcon({ off }: { off: boolean }) {
   );
 }
 
-/** A viewfinder with an A in it (snaps automatically); crossed out when off. */
-function AutoSnapIcon({ off }: { off: boolean }) {
-  return (
-    <svg {...iconProps} aria-hidden>
-      <path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" />
-      <path d="M9.5 15.5 12 8.5l2.5 7M10.4 13h3.2" strokeWidth={1.8} />
-      {off && <path d="M3 3l18 18" />}
-    </svg>
-  );
-}
-
 function GearIcon() {
   return (
     <svg {...iconProps} aria-hidden>
@@ -1226,16 +1239,25 @@ function ShapeIcon({ shape }: { shape: Shape }) {
   );
 }
 
-/** One card (front only) or a card with a flip arrow (front and back). */
+/** Front only: one side. Front and back: two arrows going around (turn it over). Different from the frame icon. */
 function SidesIcon({ both }: { both: boolean }) {
   return both ? (
-    <svg {...iconProps} aria-hidden>
-      <rect x="3" y="4" width="10" height="15" rx="1.5" />
-      <path d="M16 7h1.5A2.5 2.5 0 0 1 20 9.5V17M17.5 15 20 17.5 22.5 15" />
+    <svg {...iconProps} width={18} height={18} aria-hidden>
+      <path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.7M20 4v4.7h-4.7M20 12a8 8 0 0 1-13.7 5.6L4 15.3M4 20v-4.7h4.7" />
     </svg>
   ) : (
+    <svg {...iconProps} width={18} height={18} aria-hidden>
+      <circle cx="12" cy="12" r="8" />
+      <path d="M12 8v8" />
+    </svg>
+  );
+}
+
+function CameraIcon() {
+  return (
     <svg {...iconProps} aria-hidden>
-      <rect x="7" y="4" width="10" height="16" rx="1.5" />
+      <path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z" />
+      <circle cx="12" cy="13.5" r="3.5" />
     </svg>
   );
 }
@@ -1268,8 +1290,8 @@ const TIPS = [
     body: "The menu at the top follows what you scan. Sports cards ask for the back; Pokémon, Magic, and Yu-Gi-Oh! don't. The button right of the shutter switches between front only and front and back.",
   },
   {
-    title: "Frame, zoom, and fixes",
-    body: "Top left: auto snap and the frame shape (card, sideways, slab, or whole item). Pinch to zoom. Retake shows for a few seconds after each photo. The gear has your location and everything you've scanned.",
+    title: "Auto, frame, and fixes",
+    body: "Auto (top left) takes photos on its own; turn it off to tap for each one. Top right: the frame shape (card, sideways, slab, or whole item) and the flash. Pinch to zoom. Retake shows for a few seconds after each photo. The gear has your location and everything you've scanned.",
   },
 ];
 
