@@ -34,7 +34,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     const conditionNote = condition && condition !== "NM" ? `, near-mint price (card is ${condition})` : "";
     const notes = appendNote(
       stripPriceNotes(stripEstimateTag(item.notes ?? "")),
-      `Verified $${result.value} on ${today}: ${result.source}, ${result.matched}${conditionNote}.`,
+      `Free price $${result.value} on ${today}: ${result.source}, ${result.matched}${conditionNote}.`,
     );
 
     const { headers } = await verifiedRow(ctx);

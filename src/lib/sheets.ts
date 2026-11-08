@@ -24,7 +24,7 @@ export async function getTabs(token: string, sheetId: string): Promise<{ title: 
   return { title: json.properties?.title ?? "", tabs };
 }
 
-async function batchGet(token: string, sheetId: string, ranges: string[], render: "FORMULA" | "FORMATTED_VALUE") {
+export async function batchGet(token: string, sheetId: string, ranges: string[], render: "FORMULA" | "FORMATTED_VALUE") {
   const params = new URLSearchParams({ valueRenderOption: render, dateTimeRenderOption: "SERIAL_NUMBER", majorDimension: "ROWS" });
   for (const r of ranges) params.append("ranges", r);
   const res = await sheetsFetch(token, `${BASE}/${encodeURIComponent(sheetId)}/values:batchGet?${params}`);

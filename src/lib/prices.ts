@@ -219,3 +219,51 @@ async function yugioh(card: CardInput, f: Fetch): Promise<PriceResult> {
   if (value === null) return { found: false, reason: `No price is listed for ${found.name}.` };
   return { found: true, value, source: "TCGplayer price (cheapest printing) via YGOPRODeck", matched: found.name, url };
 }
+
+// ---------- exact lookups by card database ID (cards added by the Scan page) ----------
+
+/** The current free price for a card whose database ID is known ("scryfall:…", "ptcg:…", "ygo:<id>:<set code>"). */
+export async function priceByCatalogId(catalogId: string, details: Record<string, string>, f: Fetch = fetch): Promise<PriceResult> {
+  const [db, id, setCode] = catalogId.split(":");
+  if (db === "scryfall" && id) {
+    const r = await getJson<ScryCard>(f, `https://api.scryfall.com/cards/${encodeURIComponent(id)}`);
+    if (r.status !== 200 || !r.body) return { found: false, reason: "Scryfall didn't return the card." };
+    const c = r.body;
+    const finish = (details["Finish"] ?? "").toLowerCase();
+    const key = finish.includes("etched") ? "usd_etched" : finish.includes("foil") && !finish.includes("non") ? "usd_foil" : "usd";
+    const value = num(c.prices[key]);
+    const matched = `${c.name}, ${c.set_name} #${c.collector_number}`;
+    if (value === null) return { found: false, reason: `No price listed for ${matched}.` };
+    return { found: true, value, source: "TCGplayer market price via Scryfall", matched, url: c.purchase_uris?.tcgplayer ?? c.scryfall_uri };
+  }
+  if (db === "ptcg" && id) {
+    const headers: Record<string, string> = { ...UA };
+    if (process.env.POKEMONTCG_API_KEY) headers["x-api-key"] = process.env.POKEMONTCG_API_KEY;
+    const r = await getJson<{ data?: PokeCard }>(f, `https://api.pokemontcg.io/v2/cards/${encodeURIComponent(id)}`, headers);
+    const c = r.body?.data;
+    if (!c) return { found: false, reason: "The Pokémon TCG API didn't return the card." };
+    const prices = c.tcgplayer?.prices ?? {};
+    const variant = (details["Variant"] ?? "").toLowerCase();
+    const order = [
+      ...(variant.includes("reverse") ? ["reverseHolofoil"] : variant.includes("1st") ? ["1stEditionHolofoil", "1stEditionNormal"] : variant.includes("non") ? ["normal", "unlimited"] : ["holofoil", "unlimitedHolofoil"]),
+      "normal",
+      "holofoil",
+      "reverseHolofoil",
+    ];
+    const key = order.find((k) => num(prices[k]?.market ?? prices[k]?.mid) !== null);
+    const matched = `${c.name}, ${c.set.name} #${c.number}`;
+    if (!key) return { found: false, reason: `No TCGplayer price is listed for ${matched}.` };
+    return { found: true, value: num(prices[key]!.market ?? prices[key]!.mid)!, source: "TCGplayer market price via the Pokémon TCG API", matched, url: c.tcgplayer?.url ?? "https://www.tcgplayer.com" };
+  }
+  if (db === "ygo" && setCode) {
+    const r = await getJson<{ name?: string; set_name?: string; set_code?: string; set_rarity?: string; set_price?: string }>(
+      f,
+      `https://db.ygoprodeck.com/api/v7/cardsetsinfo.php?${new URLSearchParams({ setcode: setCode })}`,
+    );
+    const value = num(r.body?.set_price);
+    const matched = `${r.body?.name ?? "card"}, ${r.body?.set_name ?? ""} ${setCode}`.trim();
+    if (value === null) return { found: false, reason: `No price is listed for ${matched}.` };
+    return { found: true, value, source: "set price via YGOPRODeck", matched, url: "https://ygoprodeck.com" };
+  }
+  return { found: false, reason: "Unknown card database ID." };
+}
