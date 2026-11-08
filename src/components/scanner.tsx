@@ -174,9 +174,11 @@ type Capture = {
 };
 
 export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: string | null }) {
-  const [phase, setPhase] = useState<"starting" | "camera" | "review">("starting");
+  const [phase, setPhase] = useState<"starting" | "camera" | "error">("starting");
   const [location, setLocation] = useState("");
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [panel, setPanel] = useState<"settings" | "review" | null>(null);
+  const settingsOpen = panel !== null;
+  const setSettingsOpen = (open: boolean) => setPanel(open ? "settings" : null);
   const [auto, setAuto] = useState(true);
   const [step, setStep] = useState<"front" | "back">("front");
   const [mode, setMode] = useState<Mode>("auto");
@@ -537,7 +539,9 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
       if (motion > 10) armed = true;
       stillFor = motion < 3.5 ? stillFor + 150 : 0;
       const changed = !last || diff(g, last) > 12;
-      if (armed && stillFor >= 500 && changed && spread(g) > 14) {
+      // spread: something with detail is in the frame, not a blank surface. A card filling the frame
+      // with a plain white front still clears 9.
+      if (armed && stillFor >= 500 && changed && spread(g) > 9) {
         busy = true;
         armed = false;
         stillFor = 0;
@@ -572,8 +576,8 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
           ?.request("screen")
           .catch(() => null)) ?? null;
     } catch {
-      setCamError("The camera isn't available. Allow camera access for this site in your browser settings, then tap Scan.");
-      setPhase("review");
+      setCamError("The camera isn't available. Allow camera access for this site in your browser settings, then try again.");
+      setPhase("error");
     } finally {
       opening.current = false;
     }
@@ -614,17 +618,6 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
     }
   }
 
-  async function stop() {
-    setSettingsOpen(false);
-    if (card.current.front) await finishItem();
-    setTorch("unsupported");
-    stream.current?.getTracks().forEach((t) => t.stop());
-    stream.current = null;
-    await wake.current?.release().catch(() => {});
-    wake.current = null;
-    setPhase("review");
-  }
-
   // Leaving the page (say, for another tab in the menu): keep the item in progress and turn the camera off.
   const finishRef = useRef(finishItem);
   finishRef.current = finishItem;
@@ -639,7 +632,6 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
 
   // Measure the camera screen and its controls, so the frame on screen matches what's saved.
   useEffect(() => {
-    if (phase !== "camera") return;
     const place = () => {
       // Height of an element that's showing (0 when hidden with display: none, as the menu is on large screens).
       const height = (sel: string) => document.querySelector(sel)?.getBoundingClientRect().height ?? 0;
@@ -688,49 +680,10 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
     attention: results.filter((r) => ["pick", "error", "offline"].includes(r.status)).length,
   };
 
-  // ---------- review (after Done, or when the camera can't open) ----------
-
-  if (phase !== "camera") {
-    return (
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-bold tracking-tight">Scan</h1>
-          <p className="text-muted">
-            {phase === "starting"
-              ? "Opening the camera…"
-              : "Hold each item up to the camera. Cards are recognized on your phone, saved to your sheet, and priced for free when they can be."}
-          </p>
-        </div>
-        {camError && <p className="text-sm rounded-lg bg-bad-soft text-bad px-3 py-2">{camError}</p>}
-        {phase === "review" && (
-          <button type="button" onClick={start} className="min-h-14 rounded-xl bg-navy px-6 text-lg font-medium text-navy-ink">
-            {results.length ? "Scan more" : "Scan"}
-          </button>
-        )}
-        {results.length > 0 && <ResultList results={results} onPick={pick} onCondition={changeCondition} />}
-        {!ebayOn && (
-          <p className="text-sm text-muted">
-            Sports cards are saved without a price until eBay is connected. Claude&apos;s nightly run prices the ones it needs to.
-          </p>
-        )}
-        <p className="text-sm text-muted">
-          <Link href="/add">Add without a photo</Link>
-          {intakeUrl && (
-            <>
-              {" · "}
-              <a href={intakeUrl} target="_blank" rel="noopener">
-                Send photos to Claude instead
-              </a>
-            </>
-          )}
-        </p>
-      </div>
-    );
-  }
-
   // ---------- camera ----------
 
-  const prompt = step === "back" ? hint || "Now the back" : hint || "Hold an item in the frame";
+  const prompt =
+    phase === "starting" ? "Opening the camera…" : phase === "error" ? "" : step === "back" ? hint || "Now the back" : hint || "Hold an item in the frame";
   const round = "flex h-11 w-11 items-center justify-center rounded-full bg-black/50 backdrop-blur";
   const toggleAuto = () => {
     setAuto(!auto);
@@ -802,11 +755,11 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
               Skip the back
             </button>
           ) : (
-            <p className="text-center text-xs tabular-nums text-white/80">
+            <button type="button" onClick={() => setPanel("review")} className="min-h-9 px-3 text-center text-xs tabular-nums text-white/80">
               {counts.saved} saved
               {counts.working ? ` · ${counts.working} working` : ""}
               {counts.attention ? ` · ${counts.attention} to check` : ""}
-            </p>
+            </button>
           )}
         </div>
         <div className="grid grid-cols-3 items-center">
@@ -847,7 +800,59 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
         </div>
       </div>
 
-      {settingsOpen && (
+      {phase === "error" && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center p-6">
+          <div className="flex max-w-sm flex-col gap-4 rounded-2xl bg-surface p-5 text-ink">
+            <p className="text-sm">{camError}</p>
+            <button type="button" onClick={start} className="min-h-12 rounded-xl bg-navy px-5 font-medium text-navy-ink">
+              Try again
+            </button>
+            <p className="text-sm text-muted">
+              <Link href="/add">Add without a photo</Link>
+              {intakeUrl && (
+                <>
+                  {" · "}
+                  <a href={intakeUrl} target="_blank" rel="noopener">
+                    Send photos to Claude instead
+                  </a>
+                </>
+              )}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {panel === "review" && (
+        <div className="absolute inset-0 z-10 flex flex-col justify-end bg-black/50" onClick={() => setPanel(null)}>
+          <div
+            role="dialog"
+            aria-label="This session"
+            onClick={(e) => e.stopPropagation()}
+            className="flex max-h-[85%] flex-col gap-3 rounded-t-2xl bg-surface p-4 pb-6 text-ink"
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold">This session</h2>
+              <button type="button" onClick={() => setPanel(null)} className="min-h-9 rounded-full px-3 text-sm font-medium text-muted">
+                Back to scanning
+              </button>
+            </div>
+            <div className="min-h-0 overflow-y-auto">
+              {results.length ? (
+                <ResultList results={results} onPick={pick} onCondition={changeCondition} />
+              ) : (
+                <p className="text-sm text-muted">Nothing scanned yet.</p>
+              )}
+            </div>
+            {!ebayOn && (
+              <p className="text-xs text-muted">
+                Sports cards are saved without a price until eBay is connected. Claude&apos;s nightly run prices the ones it needs to.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {panel === "settings" && (
         <div className="absolute inset-0 z-10 flex flex-col justify-end bg-black/50" onClick={() => setSettingsOpen(false)}>
           <div
             role="dialog"
@@ -873,7 +878,7 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
               <span className="text-xs font-normal text-muted">Saved with every item you scan, so you can find it later.</span>
             </label>
             <div className="flex flex-col divide-y divide-line rounded-xl border border-line text-sm">
-              <button type="button" onClick={stop} className="min-h-12 px-4 text-left font-medium">
+              <button type="button" onClick={() => setPanel("review")} className="min-h-12 px-4 text-left font-medium">
                 Review this session{results.length ? ` (${results.length})` : ""}
                 {counts.attention ? <span className="text-warn"> · {counts.attention} to check</span> : null}
               </button>
@@ -972,10 +977,7 @@ function ResultList({
   onCondition: (r: Result, value: string) => void;
 }) {
   return (
-    <section aria-labelledby="scanned" className="flex flex-col gap-2">
-      <h2 id="scanned" className="text-xs font-medium uppercase tracking-wider text-muted">
-        This session
-      </h2>
+    <section aria-label="Scanned items" className="flex flex-col gap-2">
       <ul className="rounded-2xl border border-line bg-surface divide-y divide-line">
         {results.map((r) => (
           <ResultRow key={r.id} r={r} onPick={onPick} onCondition={onCondition} />
