@@ -158,6 +158,8 @@ type Result = {
   candidates?: Candidate[];
   problem?: string;
   error?: string;
+  backThumb?: string;
+  quantity?: number;
 };
 
 const money = (v: number) => `$${v.toFixed(2)}`;
@@ -177,6 +179,9 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
   const [phase, setPhase] = useState<"starting" | "camera" | "error">("starting");
   const [location, setLocation] = useState("");
   const [panel, setPanel] = useState<"settings" | "review" | null>(null);
+  const [viewing, setViewing] = useState<string | null>(null);
+  // Scans you deleted before they finished saving; the queue skips them.
+  const deleted = useRef(new Set<string>());
   const settingsOpen = panel !== null;
   const setSettingsOpen = (open: boolean) => setPanel(open ? "settings" : null);
   const [auto, setAuto] = useState(true);
@@ -285,6 +290,7 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
         };
       }
 
+      if (deleted.current.has(q.id)) return true;
       update(q.id, {
         status: "saving",
         label: candidate.label,
@@ -337,6 +343,7 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
           itemId: r.data.itemId,
           merged: r.data.merged,
           price: r.data.price,
+          quantity: r.data.quantity,
           detail: r.data.merged ? `Already had it. Quantity is now ${r.data.quantity}.` : candidate.problem ? `Check this: ${candidate.problem}.` : "",
         });
         await removeScan(q.id);
@@ -362,6 +369,7 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
     processing.current = true;
     try {
       for (const q of await pendingScans()) {
+        if (deleted.current.has(q.id)) continue;
         const existing = await new Promise<Result | undefined>((res) => setResults((rs) => (res(rs.find((r) => r.id === q.id)), rs)));
         if (existing?.status === "pick" || existing?.status === "saved") continue;
         if (!existing) {
@@ -369,6 +377,7 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
             {
               id: q.id,
               thumb: URL.createObjectURL(q.front),
+              backThumb: q.back ? URL.createObjectURL(q.back) : undefined,
               status: "waiting",
               label: "Waiting",
             },
@@ -419,6 +428,7 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
       {
         id: q.id,
         thumb: URL.createObjectURL(q.front),
+        backThumb: q.back ? URL.createObjectURL(q.back) : undefined,
         status: "waiting",
         label: "Waiting",
       },
@@ -665,6 +675,24 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
     await processOne(q, chosen);
   }
 
+  // Deletes a scan you don't want. Not saved yet: dropped from this phone. Saved: removed from the sheet,
+  // or, when it was added to an item you already had, the quantity goes back down by one.
+  async function removeResult(r: Result) {
+    if (r.status !== "saved") {
+      deleted.current.add(r.id);
+      await removeScan(r.id);
+      setResults((rs) => rs.filter((x) => x.id !== r.id));
+      return;
+    }
+    if (!r.itemId) return;
+    const res =
+      r.merged && (r.quantity ?? 1) > 1
+        ? await api(`/api/items/${r.itemId}`, { method: "PATCH", json: { quantity: (r.quantity ?? 2) - 1 } })
+        : await api(`/api/items/${r.itemId}`, { method: "DELETE" });
+    if (res.ok) setResults((rs) => rs.filter((x) => x.id !== r.id));
+    else update(r.id, { detail: `Couldn't delete: ${res.error}` });
+  }
+
   async function changeCondition(r: Result, value: string) {
     if (!r.itemId) return;
     const res = await api(`/api/items/${r.itemId}`, {
@@ -822,77 +850,69 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
         </div>
       )}
 
-      {panel === "review" && (
-        <div className="absolute inset-0 z-10 flex flex-col justify-end bg-black/50" onClick={() => setPanel(null)}>
-          <div
-            role="dialog"
-            aria-label="This session"
-            onClick={(e) => e.stopPropagation()}
-            className="flex max-h-[85%] flex-col gap-3 rounded-t-2xl bg-surface p-4 pb-6 text-ink"
-          >
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold">This session</h2>
-              <button type="button" onClick={() => setPanel(null)} className="min-h-9 rounded-full px-3 text-sm font-medium text-muted">
-                Back to scanning
-              </button>
-            </div>
-            <div className="min-h-0 overflow-y-auto">
-              {results.length ? (
-                <ResultList results={results} onPick={pick} onCondition={changeCondition} />
-              ) : (
-                <p className="text-sm text-muted">Nothing scanned yet.</p>
-              )}
-            </div>
-            {!ebayOn && (
-              <p className="text-xs text-muted">
-                Sports cards are saved without a price until eBay is connected. Claude&apos;s nightly run prices the ones it needs to.
-              </p>
-            )}
+      {panel && (
+        <div role="dialog" aria-label="Scanning settings and this session" className="absolute inset-0 z-10 flex flex-col bg-bg text-ink">
+          <div className="flex items-center justify-between gap-3 border-b border-line bg-surface px-4 pb-3 pt-[max(12px,env(safe-area-inset-top))]">
+            <h2 className="text-lg font-bold">Scanning</h2>
+            <button type="button" onClick={() => setPanel(null)} className="min-h-12 rounded-full bg-navy px-5 text-base font-medium text-navy-ink">
+              Back to camera
+            </button>
           </div>
-        </div>
-      )}
-
-      {panel === "settings" && (
-        <div className="absolute inset-0 z-10 flex flex-col justify-end bg-black/50" onClick={() => setSettingsOpen(false)}>
-          <div
-            role="dialog"
-            aria-label="Scan settings"
-            onClick={(e) => e.stopPropagation()}
-            className="flex flex-col gap-4 rounded-t-2xl bg-surface p-4 pb-6 text-ink"
-          >
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold">Settings</h2>
-              <button type="button" onClick={() => setSettingsOpen(false)} className="min-h-9 rounded-full px-3 text-sm font-medium text-muted">
-                Close
-              </button>
-            </div>
-            <label className="flex flex-col gap-1 text-sm font-medium">
+          <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4 py-4">
+            <label className="flex flex-col gap-1.5 text-base font-medium">
               Where these are kept
               <input
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && setSettingsOpen(false)}
+                onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
                 placeholder="Box 12, Binder 3…"
-                className="min-h-11 rounded-lg border border-line bg-bg px-3 text-base"
+                className="min-h-12 rounded-xl border border-line bg-surface px-3 text-base"
               />
-              <span className="text-xs font-normal text-muted">Saved with every item you scan, so you can find it later.</span>
+              <span className="text-sm font-normal text-muted">Saved with every item you scan, so you can find it later.</span>
             </label>
-            <div className="flex flex-col divide-y divide-line rounded-xl border border-line text-sm">
-              <button type="button" onClick={() => setPanel("review")} className="min-h-12 px-4 text-left font-medium">
-                Review this session{results.length ? ` (${results.length})` : ""}
+
+            <section className="flex flex-col gap-2" aria-label="This session">
+              <h3 className="text-sm font-medium text-muted">
+                This session
+                {results.length ? ` · ${results.length}` : ""}
                 {counts.attention ? <span className="text-warn"> · {counts.attention} to check</span> : null}
-              </button>
-              <Link href="/add" className="flex min-h-12 items-center px-4 font-medium text-ink no-underline">
+              </h3>
+              {results.length ? (
+                <ResultList results={results} onPick={pick} onCondition={changeCondition} onDelete={removeResult} onView={setViewing} />
+              ) : (
+                <p className="rounded-2xl border border-line bg-surface px-4 py-6 text-center text-muted">Nothing scanned yet.</p>
+              )}
+              {!ebayOn && (
+                <p className="text-sm text-muted">
+                  Sports cards are saved without a price until eBay is connected. Claude&apos;s nightly run prices the ones it needs to.
+                </p>
+              )}
+            </section>
+
+            <div className="flex flex-col divide-y divide-line rounded-2xl border border-line bg-surface">
+              <Link href="/add" className="flex min-h-14 items-center px-4 text-base font-medium text-ink no-underline">
                 Add without a photo
               </Link>
               {intakeUrl && (
-                <a href={intakeUrl} target="_blank" rel="noopener" className="flex min-h-12 items-center px-4 font-medium text-ink no-underline">
+                <a href={intakeUrl} target="_blank" rel="noopener" className="flex min-h-14 items-center px-4 text-base font-medium text-ink no-underline">
                   Send photos to Claude instead
                 </a>
               )}
             </div>
           </div>
         </div>
+      )}
+
+      {viewing && (
+        <button
+          type="button"
+          aria-label="Close photo"
+          onClick={() => setViewing(null)}
+          className="absolute inset-0 z-20 flex items-center justify-center bg-black p-4"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={viewing} alt="" className="max-h-full max-w-full object-contain" />
+        </button>
       )}
     </div>
   );
@@ -971,19 +991,21 @@ function ResultList({
   results,
   onPick,
   onCondition,
+  onDelete,
+  onView,
 }: {
   results: Result[];
   onPick: (r: Result, c: Candidate | null) => void;
   onCondition: (r: Result, value: string) => void;
+  onDelete: (r: Result) => Promise<void>;
+  onView: (url: string) => void;
 }) {
   return (
-    <section aria-label="Scanned items" className="flex flex-col gap-2">
-      <ul className="rounded-2xl border border-line bg-surface divide-y divide-line">
-        {results.map((r) => (
-          <ResultRow key={r.id} r={r} onPick={onPick} onCondition={onCondition} />
-        ))}
-      </ul>
-    </section>
+    <ul className="flex flex-col gap-3">
+      {results.map((r) => (
+        <ResultRow key={r.id} r={r} onPick={onPick} onCondition={onCondition} onDelete={onDelete} onView={onView} />
+      ))}
+    </ul>
   );
 }
 
@@ -991,61 +1013,88 @@ function ResultRow({
   r,
   onPick,
   onCondition,
+  onDelete,
+  onView,
 }: {
   r: Result;
   onPick: (r: Result, c: Candidate | null) => void;
   onCondition: (r: Result, value: string) => void;
+  onDelete: (r: Result) => Promise<void>;
+  onView: (url: string) => void;
 }) {
+  const [confirm, setConfirm] = useState(false);
+  const [busy, setBusy] = useState(false);
   const conditions = (r.category && categoryByName(r.category)?.conditions) || [];
+  const working = r.status === "reading" || r.status === "saving";
+  const photo = "h-36 w-24 shrink-0 overflow-hidden rounded-lg border border-line bg-bg";
   return (
-    <li className="flex gap-3 px-3 py-3">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={r.thumb} alt="" className="h-16 w-12 shrink-0 rounded object-cover border border-line" />
-      <div className="min-w-0 flex-1 flex flex-col gap-1 text-sm">
-        <span className="font-medium break-words">{r.label}</span>
-        <span className="text-muted">
-          {r.status === "saved"
-            ? `${r.merged ? "Added to an existing item" : "Saved"}${r.price ? `, ${money(r.price)}` : ""}`
-            : r.status === "pick"
-              ? "Which one is it?"
-              : r.status === "offline"
-                ? "Waiting for a connection. It'll save on its own."
-                : r.status === "error"
-                  ? r.error
-                  : r.status === "reading"
-                    ? "Reading it…"
-                    : r.status === "saving"
-                      ? "Saving…"
-                      : "Waiting…"}
-        </span>
-        {r.detail && <span className="text-xs text-warn">{r.detail}</span>}
-        {r.status === "pick" && (
-          <div className="flex flex-wrap gap-2 pt-1">
-            {r.candidates!.map((c) => (
-              <button
-                key={c.catalogId || c.label}
-                type="button"
-                onClick={() => onPick(r, c)}
-                className="min-h-9 rounded-lg border border-line px-3 text-left text-xs"
-              >
-                {c.label}
-                {c.price ? ` · ${money(c.price.value)}` : ""}
-              </button>
-            ))}
-            <button type="button" onClick={() => onPick(r, null)} className="min-h-9 rounded-lg px-3 text-xs text-muted underline">
-              None of these
+    <li className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-3">
+      <div className="flex gap-3">
+        <div className="flex shrink-0 gap-2">
+          <button type="button" onClick={() => onView(r.thumb)} aria-label="View the front" className={photo}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={r.thumb} alt="" className="h-full w-full object-cover" />
+          </button>
+          {r.backThumb && (
+            <button type="button" onClick={() => onView(r.backThumb!)} aria-label="View the back" className={photo}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={r.backThumb} alt="" className="h-full w-full object-cover" />
             </button>
-          </div>
-        )}
+          )}
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="font-medium break-words">{r.label}</span>
+          <span className="text-sm text-muted">
+            {r.status === "saved"
+              ? `${r.merged ? "Added to an existing item" : "Saved"}${r.price ? `, ${money(r.price)}` : ""}`
+              : r.status === "pick"
+                ? "Which one is it?"
+                : r.status === "offline"
+                  ? "Waiting for a connection. It'll save on its own."
+                  : r.status === "error"
+                    ? r.error
+                    : r.status === "reading"
+                      ? "Reading it…"
+                      : r.status === "saving"
+                        ? "Saving…"
+                        : "Waiting…"}
+          </span>
+          {r.detail && <span className="text-sm text-warn">{r.detail}</span>}
+        </div>
+      </div>
+      {r.status === "pick" && (
+        <div className="flex flex-col gap-2">
+          {r.candidates!.map((c) => (
+            <button
+              key={c.catalogId || c.label}
+              type="button"
+              onClick={() => onPick(r, c)}
+              className="min-h-12 rounded-xl border border-line px-4 text-left text-sm font-medium"
+            >
+              {c.label}
+              {c.price ? ` · ${money(c.price.value)}` : ""}
+            </button>
+          ))}
+          <button type="button" onClick={() => onPick(r, null)} className="min-h-12 rounded-xl px-4 text-left text-sm text-muted underline">
+            None of these
+          </button>
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
         {r.status === "saved" && r.itemId && (
-          <div className="flex flex-wrap items-center gap-3 pt-1 text-xs">
-            <Link href={`/items/${r.itemId}`}>Open</Link>
+          <>
+            <Link
+              href={`/items/${r.itemId}`}
+              className="inline-flex min-h-11 items-center rounded-xl border border-line px-4 text-sm font-medium text-ink no-underline"
+            >
+              Open
+            </Link>
             {!r.merged && conditions.length > 0 && (
               <select
                 aria-label="Condition"
                 defaultValue=""
                 onChange={(e) => e.target.value && onCondition(r, e.target.value)}
-                className="min-h-8 rounded border border-line bg-bg px-2"
+                className="min-h-11 rounded-xl border border-line bg-surface px-3 text-sm"
               >
                 <option value="">Change condition</option>
                 {conditions.map((c) => (
@@ -1053,7 +1102,27 @@ function ResultRow({
                 ))}
               </select>
             )}
-          </div>
+          </>
+        )}
+        {!working && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={async () => {
+              if (!confirm) {
+                setConfirm(true);
+                setTimeout(() => setConfirm(false), 4000);
+                return;
+              }
+              setBusy(true);
+              await onDelete(r);
+              setBusy(false);
+              setConfirm(false);
+            }}
+            className={`ml-auto min-h-11 rounded-xl px-4 text-sm font-medium disabled:opacity-50 ${confirm ? "bg-bad text-white" : "border border-line text-bad"}`}
+          >
+            {busy ? "Deleting…" : confirm ? (r.status === "saved" ? (r.merged ? "Tap to take 1 off" : "Tap to delete from sheet") : "Tap to delete") : "Delete"}
+          </button>
         )}
       </div>
     </li>
