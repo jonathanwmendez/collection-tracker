@@ -28,3 +28,11 @@ test("other categories and unidentified rows are skipped", () => {
   assert.equal(needsFreePrice({ ...card("Magic: The Gathering", "[Needs identifying]", null) }, o), false);
   assert.equal(needsFreePrice({ ...card("Magic: The Gathering", "", null), sheet_row: null }, o), false);
 });
+
+test("Claude-verified cards under the threshold go back to free prices once due", () => {
+  const verified = (value: number, date: string) => ({ ...card("Pokémon", `Verified $${value} on ${date}: 5 sold.`, date), market_value: value });
+  assert.equal(needsFreePrice(verified(4, "2026-09-01"), o), true);
+  assert.equal(needsFreePrice(verified(4, "2026-11-01"), o), false);
+  assert.equal(needsFreePrice(verified(40, "2026-09-01"), o), false);
+  assert.equal(needsFreePrice({ ...verified(4, "2026-09-01"), category: "Figures" }, o), false);
+});

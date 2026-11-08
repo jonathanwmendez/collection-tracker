@@ -32,7 +32,7 @@ export type RepriceResult = { checked: number; priced: number; skipped: number; 
  * Prices set by Claude's sold-price check or by hand are left for Claude's nightly run.
  */
 export async function repriceFree(db: SupabaseClient, userId: string, opts: { deadline: number }): Promise<RepriceResult> {
-  const { data: settings } = await db.from("settings").select("sheet_id, reprice_after_days").eq("user_id", userId).maybeSingle();
+  const { data: settings } = await db.from("settings").select("sheet_id, reprice_after_days, claude_threshold").eq("user_id", userId).maybeSingle();
   if (!settings?.sheet_id) return { checked: 0, priced: 0, skipped: 0, outOfTime: false };
   const sheetId = settings.sheet_id as string;
   const today = todayISO();
@@ -46,7 +46,7 @@ export async function repriceFree(db: SupabaseClient, userId: string, opts: { de
     .order("last_checked", { ascending: true, nullsFirst: true })
     .limit(5000);
   const ebayOn = ebayConfigured();
-  const rows = ((data ?? []) as Row[]).filter((r) => needsFreePrice(r, { today, cutoff, ebayOn }));
+  const rows = ((data ?? []) as Row[]).filter((r) => needsFreePrice(r, { today, cutoff, ebayOn, threshold: Number(settings.claude_threshold ?? 10) }));
   if (!rows.length) return { checked: 0, priced: 0, skipped: 0, outOfTime: false };
 
   const token = await getGoogleAccessToken(userId);
