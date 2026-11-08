@@ -54,23 +54,35 @@ type Rect = { x: number; y: number; w: number; h: number };
 /** The camera screen: its size, and the space the top and bottom controls cover. */
 type View = { sw: number; sh: number; top: number; bottom: number };
 
-/** The card frame on screen (2:3, like a card; a little taller for slabs), centered between the controls. */
-function guideRect(v: View): Rect {
+/** The frame's shape: a card upright or sideways, a graded slab, or most of the screen for other items. */
+type Shape = "card" | "sideways" | "slab" | "full";
+const SHAPES: Shape[] = ["card", "sideways", "slab", "full"];
+const SHAPE_LABEL: Record<Shape, string> = { card: "Card", sideways: "Sideways card", slab: "Graded slab", full: "Whole item" };
+// Height divided by width.
+const RATIO: Record<Exclude<Shape, "full">, number> = { card: 1.4, sideways: 1 / 1.4, slab: 1.7 };
+
+/** The frame on screen, centered between the controls. */
+function guideRect(v: View, shape: Shape = "card"): Rect {
   const bh = Math.max(1, v.sh - v.top - v.bottom);
-  let gw = v.sw * 0.86;
-  let gh = gw * 1.5;
+  if (shape === "full") return { x: v.sw * 0.04, y: v.top, w: v.sw * 0.92, h: bh * 0.98 };
+  const ratio = RATIO[shape];
+  let gw = v.sw * (shape === "sideways" ? 0.92 : 0.86);
+  let gh = gw * ratio;
   if (gh > bh * 0.94) {
     gh = bh * 0.94;
-    gw = gh / 1.5;
+    gw = gh / ratio;
   }
   return { x: (v.sw - gw) / 2, y: v.top + (bh - gh) / 2, w: gw, h: gh };
 }
 
-/** The video fills the screen and its edges are cut off (object-cover). This maps a rectangle on screen to the video. */
-function toVideo(r: Rect, video: HTMLVideoElement, v: View): Rect {
+/**
+ * The video fills the screen and its edges are cut off (object-cover), and it may be zoomed in on the
+ * screen (zoom). This maps a rectangle on screen to the video.
+ */
+function toVideo(r: Rect, video: HTMLVideoElement, v: View, zoom = 1): Rect {
   const vw = video.videoWidth;
   const vh = video.videoHeight;
-  const k = Math.max(v.sw / vw, v.sh / vh);
+  const k = Math.max(v.sw / vw, v.sh / vh) * zoom;
   const ox = (v.sw - vw * k) / 2;
   const oy = (v.sh - vh * k) / 2;
   const x = Math.max(0, (r.x - ox) / k);
@@ -96,6 +108,25 @@ async function shrink(blob: Blob, maxPx: number, quality = 0.82): Promise<Blob> 
   c.height = Math.round(bmp.height * k);
   c.getContext("2d")!.drawImage(bmp, 0, 0, c.width, c.height);
   return new Promise((res) => c.toBlob((b) => res(b!), "image/jpeg", quality));
+}
+
+/** How sharp a grayscale image is (variance of the Laplacian). Blurry pictures score low. */
+function sharpness(g: Uint8ClampedArray, w: number, h: number): number {
+  let sum = 0;
+  let sq = 0;
+  let n = 0;
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      const l = g[i - w]! + g[i + w]! + g[i - 1]! + g[i + 1]! - 4 * g[i]!;
+      sum += l;
+      sq += l * l;
+      n++;
+    }
+  }
+  if (!n) return 0;
+  const m = sum / n;
+  return sq / n - m * m;
 }
 
 // ---------- reading text on the phone (tesseract.js, loaded on first use) ----------
@@ -195,6 +226,24 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
   sidesRef.current = sides;
   // When you set Front only / Front & back yourself, a recognized card doesn't change it back.
   const sidesPicked = useRef(false);
+  const [shape, setShape] = useState<Shape>("card");
+  const shapeRef = useRef(shape);
+  shapeRef.current = shape;
+  const shapePicked = useRef(false);
+  // How close auto snap is to taking the photo (0 to 1), shown on the frame.
+  const [steady, setSteady] = useState(0);
+  const [blurry, setBlurry] = useState(false);
+  // Undo for the last photo, offered for a few seconds.
+  const [retake, setRetake] = useState<"front" | "back" | null>(null);
+  const retakeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The last photo auto snap took; cleared on retake so it can take the same view again.
+  const lastSnap = useRef<Uint8ClampedArray | null>(null);
+  // Zoom: the camera's own zoom when the phone allows it, otherwise the picture is enlarged on screen.
+  const [zoom, setZoom] = useState(1);
+  const zoomRef = useRef(1);
+  zoomRef.current = zoom;
+  const zoomCaps = useRef<{ min: number; max: number } | null>(null);
+  const [tips, setTips] = useState<number | null>(null);
   const [results, setResults] = useState<Result[]>([]);
   const [camError, setCamError] = useState("");
   const [flash, setFlash] = useState(false);
@@ -441,8 +490,13 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
   // Switches what's being scanned, and the sides to match unless you set them yourself.
   const applyMode = useCallback((m: Mode, byHand: boolean) => {
     setMode(m);
-    if (byHand) sidesPicked.current = false;
+    if (byHand) {
+      sidesPicked.current = false;
+      shapePicked.current = false;
+    }
     if (!sidesPicked.current) setSides(sidesFor(m));
+    // Other items get a frame that fills the screen; cards get the card frame.
+    if (!shapePicked.current) setShape((cur) => (m === "item" ? "full" : cur === "full" ? "card" : cur));
   }, []);
 
   // Reads the front while you flip the card, and updates the selector to what it is.
@@ -471,12 +525,37 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
 
   // ---------- camera ----------
 
+  const offerRetake = useCallback((side: "front" | "back") => {
+    setRetake(side);
+    if (retakeTimer.current) clearTimeout(retakeTimer.current);
+    retakeTimer.current = setTimeout(() => setRetake(null), 3500);
+  }, []);
+
+  // Throws away the last photo and takes it again.
+  function doRetake() {
+    if (retakeTimer.current) clearTimeout(retakeTimer.current);
+    const side = retake;
+    setRetake(null);
+    lastSnap.current = null;
+    if (side === "back") {
+      card.current.back = undefined;
+      setStep("back");
+      setHint("Retake the back");
+    } else if (side === "front") {
+      card.current = {};
+      setStep("front");
+      setHint("Retake the front");
+    }
+  }
+
   const capture = useCallback(async () => {
     const v = video.current;
     if (!v || !v.videoWidth) return;
     const vw = viewRef.current;
     if (!vw) return;
-    const blob = await frameToBlob(v, toVideo(guideRect(vw), v, vw), SAVE_PX);
+    // Hardware zoom already narrows the picture; on-screen zoom is applied here.
+    const dz = zoomCaps.current ? 1 : zoomRef.current;
+    const blob = await frameToBlob(v, toVideo(guideRect(vw, shapeRef.current), v, vw, dz), SAVE_PX);
     setFlash(true);
     setTimeout(() => setFlash(false), 120);
     navigator.vibrate?.(30);
@@ -485,7 +564,7 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
       if (card.current.front) await finishItem();
       card.current = {
         front: blob,
-        frontFull: await frameToBlob(v, toVideo({ x: 0, y: 0, w: vw.sw, h: vw.sh }, v, vw), SAVE_PX),
+        frontFull: await frameToBlob(v, toVideo({ x: 0, y: 0, w: vw.sw, h: vw.sh }, v, vw, dz), SAVE_PX),
         mode: modeRef.current,
       };
       if (sidesRef.current === "both") {
@@ -494,40 +573,61 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
       } else {
         setHint("Next one");
       }
+      offerRetake("front");
       checkFront(blob);
       return;
     }
     card.current.back = blob;
     setStep("front");
     setHint("Next one");
-  }, [finishItem, checkFront]);
+    offerRetake("back");
+  }, [finishItem, checkFront, offerRetake]);
 
-  // Auto-snap: when the picture holds still for half a second and differs from the last photo.
+  // Auto-snap: when the picture holds still and in focus for half a second, and differs from the last photo.
   useEffect(() => {
-    if (phase !== "camera" || !auto || settingsOpen) return;
+    if (phase !== "camera" || !auto || settingsOpen || tips !== null) {
+      setSteady(0);
+      setBlurry(false);
+      return;
+    }
     const c = document.createElement("canvas");
     const ctx = c.getContext("2d", { willReadFrequently: true })!;
     let prev: Uint8ClampedArray | null = null;
-    let last: Uint8ClampedArray | null = null;
     let stillFor = 0;
+    let blurFor = 0;
     let armed = true;
     let busy = false;
-    const W = 48;
+    let shown = 0;
+    const recent: number[] = [];
+    const W = 96;
     const sample = () => {
       const v = video.current;
       if (!v || !v.videoWidth) return null;
       const vw = viewRef.current;
       if (!vw) return null;
-      const r = toVideo(guideRect(vw), v, vw);
+      const r = toVideo(guideRect(vw, shapeRef.current), v, vw, zoomCaps.current ? 1 : zoomRef.current);
       c.width = W;
-      c.height = Math.round((W * r.h) / r.w);
+      c.height = Math.max(8, Math.round((W * r.h) / r.w));
       ctx.drawImage(v, r.x, r.y, r.w, r.h, 0, 0, c.width, c.height);
       const d = ctx.getImageData(0, 0, c.width, c.height).data;
       const g = new Uint8ClampedArray(d.length / 4);
       for (let i = 0; i < g.length; i++) g[i] = (d[i * 4]! * 3 + d[i * 4 + 1]! * 6 + d[i * 4 + 2]!) / 10;
-      return g;
+      return { g, w: c.width, h: c.height };
+    };
+    // Movement and detail are compared at half size, so camera noise doesn't count as movement.
+    const half = (g: Uint8ClampedArray, w: number, h: number) => {
+      const hw = Math.floor(w / 2);
+      const hh = Math.floor(h / 2);
+      const out = new Uint8ClampedArray(hw * hh);
+      for (let y = 0; y < hh; y++)
+        for (let x = 0; x < hw; x++) {
+          const i = 2 * y * w + 2 * x;
+          out[y * hw + x] = (g[i]! + g[i + 1]! + g[i + w]! + g[i + w + 1]!) / 4;
+        }
+      return out;
     };
     const diff = (a: Uint8ClampedArray, b: Uint8ClampedArray) => {
+      if (a.length !== b.length) return 99;
       let s = 0;
       for (let i = 0; i < a.length; i++) s += Math.abs(a[i]! - b[i]!);
       return s / a.length;
@@ -540,28 +640,49 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
       for (const x of a) v += (x - m) ** 2;
       return Math.sqrt(v / a.length);
     };
+    const show = (p: number) => {
+      const q = Math.round(p * 4) / 4;
+      if (q !== shown) {
+        shown = q;
+        setSteady(q);
+      }
+    };
     const t = setInterval(async () => {
       if (busy) return;
-      const g = sample();
-      if (!g) return;
+      const s = sample();
+      if (!s) return;
+      const g = half(s.g, s.w, s.h);
       const motion = prev ? diff(g, prev) : 99;
       prev = g;
       if (motion > 10) armed = true;
       stillFor = motion < 3.5 ? stillFor + 150 : 0;
-      const changed = !last || diff(g, last) > 12;
-      // spread: something with detail is in the frame, not a blank surface. A card filling the frame
-      // with a plain white front still clears 9.
-      if (armed && stillFor >= 500 && changed && spread(g) > 9) {
+      const changed = !lastSnap.current || diff(g, lastSnap.current) > 12;
+      // spread: something with detail is in the frame, not a blank surface.
+      const ready = armed && changed && spread(g) > 9;
+      // In focus: sharp enough, and not still sharpening (the camera settles its focus at the sharpest point).
+      const sharp = sharpness(s.g, s.w, s.h);
+      if (stillFor === 0) recent.length = 0;
+      recent.push(sharp);
+      if (recent.length > 4) recent.shift();
+      const focused = sharp >= 8 && sharp >= 0.85 * Math.max(...recent);
+      blurFor = ready && stillFor >= 500 && !focused ? blurFor + 150 : 0;
+      setBlurry(blurFor >= 1500);
+      show(ready ? Math.min(1, stillFor / 500) * (focused ? 1 : 0.75) : 0);
+      if (ready && stillFor >= 500 && focused) {
         busy = true;
         armed = false;
         stillFor = 0;
-        last = g;
+        lastSnap.current = g;
+        show(0);
         await capture();
         busy = false;
       }
     }, 150);
-    return () => clearInterval(t);
-  }, [phase, auto, settingsOpen, capture]);
+    return () => {
+      clearInterval(t);
+      setSteady(0);
+    };
+  }, [phase, auto, settingsOpen, tips, capture]);
 
   const opening = useRef(false);
   const start = useCallback(async () => {
@@ -579,8 +700,14 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
       setStep("front");
       setHint("Hold an item in the frame");
       const track = s.getVideoTracks()[0];
-      const caps = (track?.getCapabilities?.() ?? {}) as { torch?: boolean };
+      const caps = (track?.getCapabilities?.() ?? {}) as { torch?: boolean; zoom?: { min: number; max: number } };
       setTorch(caps.torch ? "off" : "unsupported");
+      zoomCaps.current = caps.zoom && caps.zoom.max > 1 ? { min: Math.max(1, caps.zoom.min), max: Math.min(caps.zoom.max, 5) } : null;
+      setZoom(1);
+      // First time on this phone: a few quick tips.
+      try {
+        if (!localStorage.getItem("scan-tips-v1")) setTips(0);
+      } catch {}
       wake.current =
         (await (navigator as Navigator & { wakeLock?: { request: (t: string) => Promise<{ release: () => Promise<void> }> } }).wakeLock
           ?.request("screen")
@@ -616,6 +743,48 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
     } catch {
       setTorch("unsupported");
     }
+  }
+
+  // Pinch to zoom: the camera's zoom when the phone allows it, otherwise the picture is enlarged on screen.
+  const pinch = useRef<{ d: number; z: number } | null>(null);
+  const zoomFrame = useRef<number | null>(null);
+  function setZoomLevel(z: number) {
+    const max = zoomCaps.current?.max ?? 3;
+    const next = Math.round(Math.min(max, Math.max(1, z)) * 10) / 10;
+    setZoom(next);
+    const track = stream.current?.getVideoTracks()[0];
+    if (!zoomCaps.current || !track) return;
+    if (zoomFrame.current) cancelAnimationFrame(zoomFrame.current);
+    zoomFrame.current = requestAnimationFrame(() => {
+      void track.applyConstraints({ advanced: [{ zoom: next } as MediaTrackConstraintSet] }).catch(() => {});
+    });
+  }
+  const touchDist = (t: React.TouchList) => Math.hypot(t[0]!.clientX - t[1]!.clientX, t[0]!.clientY - t[1]!.clientY);
+  function onTouchStart(e: React.TouchEvent) {
+    if (e.touches.length === 2) pinch.current = { d: touchDist(e.touches), z: zoomRef.current };
+  }
+  function onTouchMove(e: React.TouchEvent) {
+    if (e.touches.length !== 2 || !pinch.current) return;
+    setZoomLevel(pinch.current.z * (touchDist(e.touches) / pinch.current.d));
+  }
+  function onTouchEnd(e: React.TouchEvent) {
+    if (e.touches.length < 2) pinch.current = null;
+  }
+
+  // Frame shape: card, sideways card, graded slab, or whole item. Tapping cycles through them.
+  function nextShape() {
+    const next = SHAPES[(SHAPES.indexOf(shape) + 1) % SHAPES.length]!;
+    shapePicked.current = true;
+    setShape(next);
+    lastSnap.current = null;
+    setHint(`Frame: ${SHAPE_LABEL[next].toLowerCase()}`);
+  }
+
+  function closeTips() {
+    setTips(null);
+    try {
+      localStorage.setItem("scan-tips-v1", "1");
+    } catch {}
   }
 
   // Front only / Front & back. Choosing Front only while it waits for a back finishes that item without one.
@@ -702,6 +871,7 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
     update(r.id, res.ok ? { detail: `Condition set to ${value}.` } : { error: res.error });
   }
 
+  const total = results.reduce((sum, r) => sum + (r.status === "saved" && r.price ? r.price : 0), 0);
   const counts = {
     saved: results.filter((r) => r.status === "saved").length,
     working: results.filter((r) => ["waiting", "reading", "saving"].includes(r.status)).length,
@@ -711,7 +881,17 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
   // ---------- camera ----------
 
   const prompt =
-    phase === "starting" ? "Opening the camera…" : phase === "error" ? "" : step === "back" ? hint || "Now the back" : hint || "Hold an item in the frame";
+    phase === "starting"
+      ? "Opening the camera…"
+      : phase === "error"
+        ? ""
+        : blurry
+          ? "Hold steady. It's blurry."
+          : step === "back"
+            ? hint || "Now the back"
+            : hint || "Hold an item in the frame";
+  const latest = results[0];
+  const digital = !zoomCaps.current && zoom !== 1;
   const round = "flex h-11 w-11 items-center justify-center rounded-full bg-black/50 backdrop-blur";
   const toggleAuto = () => {
     setAuto(!auto);
@@ -719,13 +899,26 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
   };
   return (
     <div ref={stage} className="fixed inset-x-0 z-30 overflow-hidden bg-black text-white" style={{ top: frame.top, bottom: frame.bottom }}>
-      <video ref={video} playsInline muted autoPlay className="absolute inset-0 h-full w-full object-cover" />
-      {view && <Guide rect={guideRect(view)} />}
+      <video
+        ref={video}
+        playsInline
+        muted
+        autoPlay
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        className="absolute inset-0 h-full w-full touch-none object-cover"
+        style={digital ? { transform: `scale(${zoom})` } : undefined}
+      />
+      {view && <Guide rect={guideRect(view, shape)} steady={steady} />}
       {flash && <div className="absolute inset-0 bg-white/70" />}
       <div ref={topBar} className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-2">
-        <div className="flex flex-1 basis-0">
+        <div className="flex flex-1 basis-0 gap-2">
           <button type="button" onClick={toggleAuto} aria-pressed={auto} aria-label={auto ? "Auto snap is on" : "Auto snap is off"} className={round}>
             <AutoSnapIcon off={!auto} />
+          </button>
+          <button type="button" onClick={nextShape} aria-label={`Frame: ${SHAPE_LABEL[shape]}. Tap to change.`} className={round}>
+            <ShapeIcon shape={shape} />
           </button>
         </div>
         <label className="relative shrink-0">
@@ -770,8 +963,23 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
         ref={bottomBar}
         className="absolute inset-x-0 bottom-0 px-4 pt-6 pb-3 flex flex-col gap-3 bg-gradient-to-t from-black/75 via-black/45 to-transparent"
       >
-        <div className="flex min-h-9 items-center justify-center">
-          {step === "back" ? (
+        <div className="flex min-h-9 items-center justify-center gap-2">
+          {zoom !== 1 && (
+            <button
+              type="button"
+              onClick={() => setZoomLevel(1)}
+              aria-label="Zoom back out"
+              className="min-h-9 rounded-full bg-black/50 px-3 text-sm font-medium tabular-nums backdrop-blur"
+            >
+              {zoom.toFixed(1)}×
+            </button>
+          )}
+          {retake && (
+            <button type="button" onClick={doRetake} className="min-h-9 rounded-full bg-white px-4 text-sm font-medium text-black">
+              Retake
+            </button>
+          )}
+          {step === "back" && (
             <button
               type="button"
               onClick={() => {
@@ -782,17 +990,59 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
             >
               Skip the back
             </button>
-          ) : (
-            <button type="button" onClick={() => setPanel("review")} className="min-h-9 px-3 text-center text-xs tabular-nums text-white/80">
-              {counts.saved} saved
-              {counts.working ? ` · ${counts.working} working` : ""}
-              {counts.attention ? ` · ${counts.attention} to check` : ""}
+          )}
+        </div>
+        {/* The latest scan: what it is and its price, or what it needs. Tap for the full list. */}
+        <div className="min-h-14">
+          {latest && (
+            <button
+              type="button"
+              onClick={() => setPanel("review")}
+              className="flex w-full items-center gap-3 rounded-2xl bg-black/60 p-2 pr-3 text-left backdrop-blur"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={latest.thumb} alt="" className="h-12 w-9 shrink-0 rounded object-cover" />
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate text-sm font-medium">{latest.status === "waiting" || latest.status === "reading" ? "Reading…" : latest.label}</span>
+                <span className={`truncate text-xs ${["pick", "error", "offline"].includes(latest.status) ? "text-warn" : "text-white/70"}`}>
+                  {latest.status === "saved"
+                    ? latest.merged
+                      ? "Added to one you had"
+                      : latest.problem
+                        ? "Saved · check this"
+                        : "Saved"
+                    : latest.status === "pick"
+                      ? "Tap to pick the right one"
+                      : latest.status === "offline"
+                        ? "Saves when you're back online"
+                        : latest.status === "error"
+                          ? "Couldn't save. Tap for details."
+                          : latest.status === "saving"
+                            ? "Saving…"
+                            : `${counts.saved} saved`}
+                </span>
+              </span>
+              {latest.status === "saved" && (
+                <span className="shrink-0 text-right">
+                  <span className="block font-mono text-base font-medium tabular-nums">{latest.price ? money(latest.price) : "No price yet"}</span>
+                </span>
+              )}
             </button>
           )}
         </div>
         <div className="grid grid-cols-3 items-center">
-          <button type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings" className={`${round} justify-self-start`}>
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            aria-label={counts.attention ? `Settings, ${counts.attention} to check` : "Settings"}
+            className={`${round} relative justify-self-start`}
+          >
             <GearIcon />
+            {counts.attention > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-warn px-1 text-[11px] font-bold text-black">
+                {counts.attention}
+              </span>
+            )}
           </button>
           <button
             type="button"
@@ -813,20 +1063,11 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
             <SidesIcon both={sides === "both"} />
           </button>
         </div>
-        <div className="flex gap-2 overflow-x-auto">
-          {results.slice(0, 12).map((r) => (
-            <span key={r.id} className="relative shrink-0">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={r.thumb} alt="" className="h-14 w-10 rounded object-cover" />
-              <i
-                className={`absolute -top-1 -right-1 h-3 w-3 rounded-full border border-black ${
-                  r.status === "saved" ? "bg-ok" : ["pick", "error", "offline"].includes(r.status) ? "bg-warn" : "bg-white/70"
-                }`}
-              />
-            </span>
-          ))}
-        </div>
       </div>
+
+      {tips !== null && phase === "camera" && (
+        <Tips step={tips} onNext={() => (tips >= TIPS.length - 1 ? closeTips() : setTips(tips + 1))} onClose={closeTips} />
+      )}
 
       {phase === "error" && (
         <div className="absolute inset-0 z-10 flex items-center justify-center p-6">
@@ -853,7 +1094,14 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
       {panel && (
         <div role="dialog" aria-label="Scanning settings and this session" className="absolute inset-0 z-10 flex flex-col bg-bg text-ink">
           <div className="flex items-center justify-between gap-3 border-b border-line bg-surface px-4 pb-3 pt-[max(12px,env(safe-area-inset-top))]">
-            <h2 className="text-lg font-bold">Scanning</h2>
+            <div className="flex flex-col">
+              <h2 className="text-lg font-bold">Scanning</h2>
+              {counts.saved > 0 && (
+                <p className="text-sm text-muted tabular-nums">
+                  {counts.saved} saved{total ? ` · ${money(total)} total` : ""}
+                </p>
+              )}
+            </div>
             <button type="button" onClick={() => setPanel(null)} className="min-h-12 rounded-full bg-navy px-5 text-base font-medium text-navy-ink">
               Back to camera
             </button>
@@ -961,6 +1209,23 @@ function GearIcon() {
   );
 }
 
+/** The frame shape: an upright card, a sideways card, a tall slab, or corners for the whole item. */
+function ShapeIcon({ shape }: { shape: Shape }) {
+  return (
+    <svg {...iconProps} aria-hidden>
+      {shape === "card" && <rect x="7" y="4" width="10" height="16" rx="1.5" />}
+      {shape === "sideways" && <rect x="3" y="7" width="18" height="10" rx="1.5" />}
+      {shape === "slab" && (
+        <>
+          <rect x="6.5" y="2.5" width="11" height="19" rx="1.5" />
+          <path d="M6.5 7h11" />
+        </>
+      )}
+      {shape === "full" && <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" />}
+    </svg>
+  );
+}
+
 /** One card (front only) or a card with a flip arrow (front and back). */
 function SidesIcon({ both }: { both: boolean }) {
   return both ? (
@@ -975,14 +1240,58 @@ function SidesIcon({ both }: { both: boolean }) {
   );
 }
 
-/** The card frame on screen, the same area that's saved (see guideRect and toVideo). */
-function Guide({ rect: r }: { rect: Rect }) {
+/** The frame on screen, the same area that's saved (see guideRect and toVideo). Turns green as auto snap gets ready. */
+function Guide({ rect: r, steady }: { rect: Rect; steady: number }) {
+  const on = steady > 0;
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
       <div
-        className="absolute rounded-xl border-2 border-white/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.25)]"
+        className={`absolute overflow-hidden rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.25)] transition-[border-color,border-width] duration-150 ${
+          on ? "border-[3px] border-ok" : "border-2 border-white/90"
+        }`}
         style={{ left: r.x, top: r.y, width: r.w, height: r.h }}
-      />
+      >
+        {/* Fills up as the picture holds still; the photo is taken when it's full. */}
+        <div className="absolute bottom-0 left-0 h-1.5 bg-ok transition-[width] duration-150" style={{ width: `${steady * 100}%` }} />
+      </div>
+    </div>
+  );
+}
+
+const TIPS = [
+  {
+    title: "Hold it still",
+    body: "Put an item inside the frame. The frame turns green and the photo is taken on its own. Tap the round button any time to take it yourself.",
+  },
+  {
+    title: "It figures out what it is",
+    body: "The menu at the top follows what you scan. Sports cards ask for the back; Pokémon, Magic, and Yu-Gi-Oh! don't. The button right of the shutter switches between front only and front and back.",
+  },
+  {
+    title: "Frame, zoom, and fixes",
+    body: "Top left: auto snap and the frame shape (card, sideways, slab, or whole item). Pinch to zoom. Retake shows for a few seconds after each photo. The gear has your location and everything you've scanned.",
+  },
+];
+
+function Tips({ step, onNext, onClose }: { step: number; onNext: () => void; onClose: () => void }) {
+  const tip = TIPS[step]!;
+  return (
+    <div className="absolute inset-0 z-10 flex items-end bg-black/60 p-4 pb-8" role="dialog" aria-label="Scanning tips">
+      <div className="flex w-full flex-col gap-3 rounded-2xl bg-surface p-5 text-ink">
+        <p className="text-xs font-medium text-muted tabular-nums">
+          {step + 1} of {TIPS.length}
+        </p>
+        <h2 className="text-lg font-bold">{tip.title}</h2>
+        <p className="text-base">{tip.body}</p>
+        <div className="flex items-center justify-between gap-3 pt-1">
+          <button type="button" onClick={onClose} className="min-h-12 px-2 text-base font-medium text-muted">
+            Skip
+          </button>
+          <button type="button" onClick={onNext} className="min-h-12 rounded-xl bg-navy px-6 text-base font-medium text-navy-ink">
+            {step === TIPS.length - 1 ? "Start scanning" : "Next"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
