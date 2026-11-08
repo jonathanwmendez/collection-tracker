@@ -23,8 +23,6 @@ const LABEL: Record<CardKind, string> = {
   pokemon: "Pokémon card",
   yugioh: "Yu-Gi-Oh! card",
 };
-// Trading cards all have the same back, so they don't need one. Sports cards are read from the back.
-const NO_BACK_NEEDED: CardKind[] = ["magic", "pokemon", "yugioh"];
 // What's being scanned. "auto" until the first card is recognized; the selector follows each scan.
 type Mode = "auto" | CardKind | "item";
 const MODES: Array<{ value: Mode; label: string }> = [
@@ -35,9 +33,8 @@ const MODES: Array<{ value: Mode; label: string }> = [
   { value: "yugioh", label: "Yu-Gi-Oh!" },
   { value: "item", label: "Other items" },
 ];
+/** 1 photo (the front) per item, or 2 (front and back). Starts at 1; only the button changes it. */
 type Sides = "front" | "both";
-/** Sports cards are read from the back; trading cards and other items only need the front. */
-const sidesFor = (m: Mode): Sides => (m === "auto" || m === "sports" ? "both" : "front");
 // Scans saved by older versions of this page named their kind up front.
 const OLD_KIND: Record<string, CardKind> = {
   sports: "sports",
@@ -237,14 +234,12 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
   outlineRef.current = outline;
   const [step, setStep] = useState<"front" | "back">("front");
   const [mode, setMode] = useState<Mode>("auto");
-  const [sides, setSides] = useState<Sides>("both");
+  const [sides, setSides] = useState<Sides>("front");
   const [torch, setTorch] = useState<"off" | "on" | "unsupported">("unsupported");
   const modeRef = useRef(mode);
   modeRef.current = mode;
   const sidesRef = useRef(sides);
   sidesRef.current = sides;
-  // When you set Front only / Front & back yourself, a recognized card doesn't change it back.
-  const sidesPicked = useRef(false);
   const [shape, setShape] = useState<Shape>("card");
   const shapeRef = useRef(shape);
   shapeRef.current = shape;
@@ -508,15 +503,10 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
     void runQueue();
   }, [runQueue]);
 
-  // Reads the front while you flip the card. A Pokémon, Magic, or Yu-Gi-Oh! card doesn't need its back.
-  // Switches what's being scanned, and the sides to match unless you set them yourself.
+  // Switches what's being scanned (and the frame shape to match, unless you picked one).
   const applyMode = useCallback((m: Mode, byHand: boolean) => {
     setMode(m);
-    if (byHand) {
-      sidesPicked.current = false;
-      shapePicked.current = false;
-    }
-    if (!sidesPicked.current) setSides(sidesFor(m));
+    if (byHand) shapePicked.current = false;
     // Other items get a frame that fills the screen; cards get the card frame.
     if (!shapePicked.current) setShape((cur) => (m === "item" ? "full" : cur === "full" ? "card" : cur));
   }, []);
@@ -533,13 +523,7 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
         card.current.detected = kind;
         if (!kind) return;
         applyMode(kind, false);
-        if (stepRef.current !== "back") return;
-        if (NO_BACK_NEEDED.includes(kind) && !sidesPicked.current) {
-          setStep("front");
-          setHint(`${LABEL[kind]}. Next one.`);
-        } else {
-          setHint(`${LABEL[kind]}. Now the back.`);
-        }
+        setHint(stepRef.current === "back" ? `${LABEL[kind]}. Now the back.` : `${LABEL[kind]}. Next one.`);
       })();
     },
     [applyMode],
@@ -859,7 +843,6 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
 
   // Front only / Front & back. Choosing Front only while it waits for a back finishes that item without one.
   function chooseSides(next: Sides) {
-    sidesPicked.current = true;
     setSides(next);
     if (next === "front" && stepRef.current === "back") {
       setStep("front");
@@ -1399,7 +1382,7 @@ const TIPS = [
   },
   {
     title: "It figures out what it is",
-    body: "The menu at the top follows what you scan. Sports cards take 2 photos (front and back); Pokémon, Magic, and Yu-Gi-Oh! take 1.",
+    body: "The menu at the top follows what you scan. Each item takes 1 photo, the front. Tap the button at the bottom right for 2, front and back. Sports cards are easiest to identify from the back.",
   },
   {
     title: "Auto, frame, and fixes",
