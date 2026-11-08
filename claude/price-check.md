@@ -9,7 +9,8 @@ B) Nightly check (3:30 AM). This run's message names no rows. Do these steps in 
   3. Cards over the threshold: rows on the four card tabs whose latest price note starts with "Free price $" or "Asking $" and whose Market Value is at least the threshold (see WHAT THE APP PRICES). Give each a sold-price check once.
   4. Repricing: rows whose Last Checked is more than N days before today, where N is the "Reprice After (Days)" setting on the 'Summary' tab (30 if blank), and whose price is yours to keep current (see WHAT THE APP PRICES). Work oldest first and keep going while there is usage left, until no rows are due or the time limit below is reached.
   5. CERTIFICATES below.
-  6. Alerts (see PRICE ALERTS).
+  6. ACCURACY SAMPLE below (Sundays only).
+  7. Alerts (see PRICE ALERTS).
 - In every kind of run, skip rows whose Status is "Sold". They are no longer in the collection.
 
 WHAT THE APP PRICES (so you don't repeat free work)
@@ -64,6 +65,11 @@ CERTIFICATES (nightly run only, after pricing, while there is time)
 - When the record matches the item (player or subject, item type, and grade for slabs), append "Cert verified YYYY-MM-DD: <authenticator> <number> matches." When it doesn't match or isn't found, append "Check this: certificate <authenticator> <number> doesn't match the item." or "... wasn't found." When the site can't be read, leave the row for the next night and don't add anything.
 - An autographed item (Notes, Parallel / Variant, or the name says Auto, Autograph, Signed, or Signature) with no Authenticator: append "Check this: autograph with no certificate." once. Price it as unauthenticated unless it is a manufacturer's on-card autograph.
 - Price authenticated autographs from sales that carry the same authentication.
+
+ACCURACY SAMPLE (nightly run on Sundays only, after CERTIFICATES, while there is time)
+- Pick 5 card rows at random whose latest price note starts with "Free price $" or "Asking $" (include sports cards when there are any). For each, find the median of recent sold prices the same way as HOW TO PRICE. Don't change these rows.
+- Write one line in the Price Log Notes: "Accuracy sample: <name> app $X vs sold $Y (+Z%); ...; average off by N%."
+- If the app's prices are off by more than 25% on average, say so in the summary and suggest a different "Claude Check Over ($)" amount.
 
 NEW TABS
 If the spreadsheet has a category tab that isn't listed above (any tab except 'Summary' and 'Price Log'), read its row 1 to find the "Market Value (Each)", "Last Checked", and "Notes" columns and price it the same way. Before pricing a new kind of item, search for the trusted sold-price sources for it (completed-sales databases, auction archives, the hobby's standard price guide) and use the best ones. List those sources in your final summary under "Suggested sources for <tab>" so they can be added to this list.
@@ -122,7 +128,7 @@ cached = sum((v.get('cache_read_input_tokens') or 0) for v in u.values())
 print(new, cached)
 EOF
    If that fails, leave the token cells blank and say why in Notes.
-2. Find the first empty row in 'Price Log' (read 'Price Log'!A:A) and write one row to A:K: Date (YYYY-MM-DD), Started (h:mm AM/PM when you began), Finished (h:mm AM/PM now), Run ("Nightly" or "Immediate"), Priced (rows given a new verified value), Couldn't Price (rows marked no reliable sold data), Still Due (rows still due for repricing after this run), New Tokens, Cached Tokens, New Tokens Per Item (New Tokens divided by rows handled, rounded; blank if none), Notes (items added from photos, scans identified, photos or scans you couldn't identify, certificates checked, alerts emailed, stopped at 8:00 AM, errors, or anything unusual; otherwise blank).
+2. Find the first empty row in 'Price Log' (read 'Price Log'!A:A) and write one row to A:K: Date (YYYY-MM-DD), Started (h:mm AM/PM when you began), Finished (h:mm AM/PM now), Run ("Nightly" or "Immediate"), Priced (rows given a new verified value), Couldn't Price (rows marked no reliable sold data), Still Due (rows still due for repricing after this run), New Tokens, Cached Tokens, New Tokens Per Item (New Tokens divided by rows handled, rounded; blank if none), Notes (items added from photos, scans identified, photos or scans you couldn't identify, certificates checked, the accuracy sample, alerts emailed, stopped at 8:00 AM, errors, or anything unusual; otherwise blank).
 
 FINISH
-End with a short summary: which kind of run this was; items added from photos and scans identified (tab, name, row, and any "Check this"); certificates verified or flagged; each item priced (tab, name, old value, new value, sources, and graded prices if found); anything you could not price; alerts sent; how many rows are still due for repricing; tokens used; and any "Suggested sources" for new tabs. If there was nothing to price, say so in one line.
+End with a short summary: which kind of run this was; items added from photos and scans identified (tab, name, row, and any "Check this"); certificates verified or flagged; the accuracy sample (Sundays); each item priced (tab, name, old value, new value, sources, and graded prices if found); anything you could not price; alerts sent; how many rows are still due for repricing; tokens used; and any "Suggested sources" for new tabs. If there was nothing to price, say so in one line.

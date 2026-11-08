@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { jsonError, requireUser } from "@/lib/api-auth";
 import { isOwner } from "@/lib/access";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { selectAll } from "@/lib/paged";
 
 /**
  * Deletes the signed-in person's account and everything the app stores for them: items, photos'
@@ -22,8 +23,10 @@ export async function DELETE(request: Request) {
   const admin = createAdminClient();
 
   // Previews in Storage aren't removed by the database cascade.
-  const { data: photos } = await supabase.from("photos").select("id, item_id, preview_path");
-  const paths = (photos ?? []).flatMap((p) =>
+  const photos = await selectAll<{ id: string; item_id: string; preview_path: string | null }>((from, to) =>
+    supabase.from("photos").select("id, item_id, preview_path").order("id").range(from, to),
+  ).catch(() => []);
+  const paths = photos.flatMap((p) =>
     [p.preview_path as string | null, `${user.id}/${p.item_id}/${p.id}-full.jpg`].filter((x): x is string => Boolean(x)),
   );
   for (let i = 0; i < paths.length; i += 500) await admin.storage.from("previews").remove(paths.slice(i, i + 500));

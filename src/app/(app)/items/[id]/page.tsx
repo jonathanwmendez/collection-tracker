@@ -8,6 +8,7 @@ import { money, shortDate, signedMoney } from "@/lib/format";
 import { canCheckPrice } from "@/lib/prices";
 import { priceSource } from "@/lib/sheet-format";
 import { ItemActions } from "@/components/item-actions";
+import { AddPhoto } from "@/components/add-photo";
 import { PhotoGallery } from "@/components/photo-gallery";
 import { Sparkline } from "@/components/sparkline";
 import { StatusBadge, ValueBadge } from "@/components/value-badge";
@@ -89,6 +90,18 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
             label: p.label,
           }))}
           missing={labeledPhotos(item).missing}
+        />
+      )}
+      {item.status !== "Sold" && item.sheet_row && (
+        <AddPhoto
+          itemId={item.id}
+          category={item.category}
+          name={item.name}
+          sides={[
+            ...(item.photos.some((p) => p.side !== "back" && p.side !== "coa") ? [] : [{ side: "front" as const, label: "Add photo" }]),
+            ...(categoryByName(item.category)?.backPhoto && !item.photos.some((p) => p.side === "back") ? [{ side: "back" as const, label: "Add back" }] : []),
+            { side: "coa" as const, label: item.photos.some((p) => p.side === "coa") ? "Replace certificate" : "Add certificate" },
+          ]}
         />
       )}
 

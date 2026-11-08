@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { toItem, type Item } from "./collection";
 import { computeMovers, type Move } from "./movers";
+import { selectAll } from "./paged";
 
 export { staleCutoff } from "./collection";
 
@@ -37,11 +38,17 @@ const ITEM_COLUMNS =
   "id, category, name, details, condition, quantity, market_value, value_status, last_checked, status, notes, sheet_row, updated_at, paid, sold_price, sold_on, psa9, psa10, location, catalog_id, authenticator, cert_number, photos(id, position, drive_url, side)";
 
 export async function getItems(supabase: SupabaseClient, category?: string): Promise<Item[]> {
-  let q = supabase.from("items").select(ITEM_COLUMNS).order("sheet_row", { ascending: true });
-  if (category) q = q.eq("category", category);
-  const { data, error } = await q;
-  if (error) console.error("Load items failed", error);
-  return (data ?? []).map((r) => toItem(r as Record<string, unknown>));
+  try {
+    const rows = await selectAll<Record<string, unknown>>((from, to) => {
+      let q = supabase.from("items").select(ITEM_COLUMNS).order("category").order("sheet_row", { ascending: true }).order("id");
+      if (category) q = q.eq("category", category);
+      return q.range(from, to);
+    });
+    return rows.map(toItem);
+  } catch (e) {
+    console.error("Load items failed", e);
+    return [];
+  }
 }
 
 export type PriceCheck = { id: string; checked_at: string; value: number | null; method: string; summary: string };
@@ -84,12 +91,9 @@ export type { Move } from "./movers";
 /** Each item's latest value change, from its price history in the last 90 days. */
 export async function getMovers(supabase: SupabaseClient, items: Item[], sinceDays = 90): Promise<Move[]> {
   const since = new Date(Date.now() - sinceDays * 86400000).toISOString();
-  const { data } = await supabase
-    .from("price_checks")
-    .select("item_id, value, checked_at")
-    .gte("checked_at", since)
-    .order("checked_at", { ascending: false })
-    .limit(5000);
+  const data = await selectAll<{ item_id: string; value: number | string | null; checked_at: string }>((from, to) =>
+    supabase.from("price_checks").select("item_id, value, checked_at").gte("checked_at", since).order("checked_at", { ascending: false }).order("id").range(from, to),
+  ).catch(() => []);
   return computeMovers(
     (data ?? []).map((r) => ({ item_id: r.item_id as string, value: r.value === null ? null : Number(r.value), checked_at: r.checked_at as string })),
     items,

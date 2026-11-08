@@ -1,4 +1,5 @@
 import "server-only";
+import { selectAll } from "./paged";
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CATEGORIES, categoryByName } from "./categories";
@@ -83,12 +84,14 @@ export async function syncCollection(supabase: SupabaseClient, userId: string, o
     });
   }
 
-  const { data: existingRows, error: exErr } = await supabase
-    .from("items")
-    .select("id, category, name, sheet_row, market_value, last_checked, row_hash")
-    .eq("user_id", userId);
-  if (exErr) throw new SyncError("Couldn't read the app's copy of your collection.", 500);
-  const existing = (existingRows ?? []) as Existing[];
+  let existing: Existing[];
+  try {
+    existing = await selectAll<Existing>((from, to) =>
+      supabase.from("items").select("id, category, name, sheet_row, market_value, last_checked, row_hash").eq("user_id", userId).order("id").range(from, to),
+    );
+  } catch {
+    throw new SyncError("Couldn't read the app's copy of your collection.", 500);
+  }
 
   // Match rows to items: same tab and row with the same name first, then same tab and name (rows that moved).
   const byRow = new Map(existing.map((e) => [`${e.category}#${e.sheet_row}`, e]));
@@ -155,11 +158,9 @@ export async function syncCollection(supabase: SupabaseClient, userId: string, o
   const removed = existing.filter((e) => !used.has(e.id));
 
   // Photos: one row per Drive file linked in the Photo column, then the Back Photo column (cards).
-  const { data: photoRows } = await supabase
-    .from("photos")
-    .select("id, item_id, drive_file_id, preview_path, position, side")
-    .eq("user_id", userId);
-  const photos = (photoRows ?? []) as ExistingPhoto[];
+  const photos = await selectAll<ExistingPhoto>((from, to) =>
+    supabase.from("photos").select("id, item_id, drive_file_id, preview_path, position, side").eq("user_id", userId).order("id").range(from, to),
+  );
   const photosByItem = new Map<string, ExistingPhoto[]>();
   for (const p of photos) photosByItem.set(p.item_id, [...(photosByItem.get(p.item_id) ?? []), p]);
 

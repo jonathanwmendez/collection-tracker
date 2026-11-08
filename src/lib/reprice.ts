@@ -5,6 +5,7 @@ import { askingPrice, ebayConfigured } from "./ebay";
 import { getGoogleAccessToken } from "./google";
 import { canCheckPrice, lookupCardPrice, priceByCatalogId } from "./prices";
 import { needsFreePrice } from "./reprice-rules";
+import { selectAll } from "./paged";
 import { appendNote, cellText, colIndex, COL, readHeaders, stripEstimateTag, stripPriceNotes, todayISO, valueStatusOf, type CellWrite } from "./sheet-format";
 import { batchGet, writeMany } from "./sheets";
 
@@ -38,15 +39,19 @@ export async function repriceFree(db: SupabaseClient, userId: string, opts: { de
   const today = todayISO();
   const cutoff = new Date(Date.now() - (Number(settings.reprice_after_days) || 30) * 86400000).toISOString().slice(0, 10);
 
-  const { data } = await db
-    .from("items")
-    .select("id, category, name, details, condition, notes, last_checked, market_value, sheet_row, status, catalog_id")
-    .eq("user_id", userId)
-    .neq("status", "Sold")
-    .order("last_checked", { ascending: true, nullsFirst: true })
-    .limit(5000);
+  const all = await selectAll<Row>((from, to) =>
+    db
+      .from("items")
+      .select("id, category, name, details, condition, notes, last_checked, market_value, sheet_row, status, catalog_id")
+      .eq("user_id", userId)
+      .neq("status", "Sold")
+      .order("id")
+      .range(from, to),
+  );
+  // Oldest price first, so a run that runs out of time picks up where it left off tomorrow.
+  all.sort((a, b) => (a.last_checked ?? "").localeCompare(b.last_checked ?? ""));
   const ebayOn = ebayConfigured();
-  const rows = ((data ?? []) as Row[]).filter((r) => needsFreePrice(r, { today, cutoff, ebayOn, threshold: Number(settings.claude_threshold ?? 10) }));
+  const rows = all.filter((r) => needsFreePrice(r, { today, cutoff, ebayOn, threshold: Number(settings.claude_threshold ?? 10) }));
   if (!rows.length) return { checked: 0, priced: 0, skipped: 0, outOfTime: false };
 
   const token = await getGoogleAccessToken(userId);
@@ -62,20 +67,15 @@ export async function repriceFree(db: SupabaseClient, userId: string, opts: { de
   let skipped = 0;
   let outOfTime = false;
   const writes: Array<CellWrite & { tab: string; row: number }> = [];
-  const updates: Array<{ id: string; patch: Record<string, unknown>; check: Record<string, unknown> }> = [];
+  const updates: Array<{ id: string; patch: Record<string, unknown>; check: Record<string, unknown> | null }> = [];
 
-  for (const r of rows) {
-    if (Date.now() > opts.deadline) {
-      outOfTime = true;
-      break;
-    }
-    const category = categoryByName(r.category);
+  const priceOne = async (r: Row) => {
     const headers = headerOf.get(r.category);
-    if (!category || !headers) continue;
+    if (!categoryByName(r.category) || !headers) return;
     // The sheet may have changed since the last sync: only write when the row still holds this item.
     if ((nameAt.get(r.category)?.[r.sheet_row! - 1] ?? "").toLowerCase() !== r.name.toLowerCase()) {
       skipped++;
-      continue;
+      return;
     }
     checked++;
     let value: number | null = null;
@@ -104,7 +104,7 @@ export async function repriceFree(db: SupabaseClient, userId: string, opts: { de
     }
     if (value === null) {
       skipped++;
-      continue;
+      return;
     }
     priced++;
     const notes = appendNote(stripPriceNotes(stripEstimateTag(r.notes ?? "")), note);
@@ -118,14 +118,27 @@ export async function repriceFree(db: SupabaseClient, userId: string, opts: { de
     updates.push({
       id: r.id,
       patch: { market_value: value, last_checked: today, notes, value_status: valueStatusOf(today, notes) },
-      check: { item_id: r.id, user_id: userId, value, method, summary: note },
+      // Price history only gets a point when the price moved, so daily checks don't fill the database.
+      check: value === (r.market_value === null ? null : Number(r.market_value)) ? null : { item_id: r.id, user_id: userId, value, method, summary: note },
     });
+  };
+
+  // A few lookups at a time: fast enough for a large collection, gentle on the free card databases.
+  for (let i = 0; i < rows.length; i += 4) {
+    if (Date.now() > opts.deadline) {
+      outOfTime = true;
+      break;
+    }
+    await Promise.all(rows.slice(i, i + 4).map(priceOne));
   }
 
   // One write for the whole batch keeps the Sheets API well under its limits.
   for (let i = 0; i < writes.length; i += 300) await writeMany(token, sheetId, writes.slice(i, i + 300));
-  for (const u of updates) await db.from("items").update(u.patch).eq("id", u.id);
-  for (let i = 0; i < updates.length; i += 500) await db.from("price_checks").insert(updates.slice(i, i + 500).map((u) => u.check));
+  for (let i = 0; i < updates.length; i += 20) {
+    await Promise.all(updates.slice(i, i + 20).map((u) => db.from("items").update(u.patch).eq("id", u.id)));
+  }
+  const checks = updates.flatMap((u) => (u.check ? [u.check] : []));
+  for (let i = 0; i < checks.length; i += 500) await db.from("price_checks").insert(checks.slice(i, i + 500));
 
   return { checked, priced, skipped, outOfTime };
 }

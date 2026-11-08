@@ -36,9 +36,14 @@ export default async function ValuePage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-3">
         <h1 className="text-2xl font-bold tracking-tight">Value</h1>
-        <a href="/api/export" className="min-h-9 inline-flex items-center rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink no-underline">
-          Export CSV
-        </a>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Link href="/report" className="min-h-9 inline-flex items-center rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink no-underline">
+            Insurance report
+          </Link>
+          <a href="/api/export" className="min-h-9 inline-flex items-center rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink no-underline">
+            Export CSV
+          </a>
+        </div>
       </div>
       <SyncBar />
       <ValueDashboard

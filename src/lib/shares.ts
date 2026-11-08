@@ -2,6 +2,7 @@ import "server-only";
 import { toItem, type Item } from "./collection";
 import { coversCategory, isExpired, looksLikeToken, type Share } from "./share-rules";
 import { createAdminClient } from "./supabase/admin";
+import { selectAll } from "./paged";
 
 const SHARE_ITEM_COLUMNS =
   "id, category, name, details, condition, quantity, market_value, value_status, last_checked, status, notes, sheet_row, updated_at, photos(id, position, drive_url, side)";
@@ -26,10 +27,12 @@ function redact(item: Item, share: Share): Item {
 
 export async function getSharedItems(share: Share): Promise<Item[]> {
   // Sold items are no longer in the collection.
-  let q = createAdminClient().from("items").select(SHARE_ITEM_COLUMNS).eq("user_id", share.user_id).neq("status", "Sold");
-  if (share.categories?.length) q = q.in("category", share.categories);
-  const { data } = await q.order("sheet_row", { ascending: true });
-  return (data ?? []).map((r) => redact(toItem(r as Record<string, unknown>), share));
+  const rows = await selectAll<Record<string, unknown>>((from, to) => {
+    let q = createAdminClient().from("items").select(SHARE_ITEM_COLUMNS).eq("user_id", share.user_id).neq("status", "Sold");
+    if (share.categories?.length) q = q.in("category", share.categories);
+    return q.order("category").order("sheet_row", { ascending: true }).order("id").range(from, to);
+  });
+  return rows.map((r) => redact(toItem(r), share));
 }
 
 export async function getSharedItem(share: Share, id: string): Promise<Item | null> {

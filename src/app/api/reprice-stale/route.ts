@@ -6,6 +6,7 @@ import { getGoogleAccessToken } from "@/lib/google";
 import { cellText, colIndex, COL, type CellWrite } from "@/lib/sheet-format";
 import { readTabs, writeMany } from "@/lib/sheets";
 import { staleCutoff } from "@/lib/data";
+import { selectAll } from "@/lib/paged";
 
 export const maxDuration = 60;
 
@@ -23,12 +24,10 @@ export async function POST() {
       .maybeSingle();
     if (!settings?.sheet_id) return jsonError("Connect your Google Sheet in Settings first.", 400);
 
-    const { data: stale } = await supabase
-      .from("items")
-      .select("id, category, name, sheet_row")
-      .lt("last_checked", staleCutoff(settings.reprice_after_days ?? 30))
-      .neq("status", "Sold");
-    const items = stale ?? [];
+    const cutoff = staleCutoff(settings.reprice_after_days ?? 30);
+    const items = await selectAll<{ id: string; category: string; name: string; sheet_row: number | null }>((from, to) =>
+      supabase.from("items").select("id, category, name, sheet_row").lt("last_checked", cutoff).neq("status", "Sold").order("id").range(from, to),
+    );
     if (items.length === 0) return NextResponse.json({ queued: 0, skipped: 0 });
 
     const token = await getGoogleAccessToken(user.id);

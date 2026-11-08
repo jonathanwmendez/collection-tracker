@@ -54,6 +54,22 @@
   }
 }
 
+/* Printing (the insurance report) always uses the light colors on white paper. */
+@media print {
+  :root {
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --ink: #000000;
+    --muted: #444b55;
+    --line: #c9cfd8;
+    --link: #000000;
+    color-scheme: light;
+  }
+  @page {
+    margin: 14mm 12mm;
+  }
+}
+
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);

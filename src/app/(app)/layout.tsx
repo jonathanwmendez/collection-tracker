@@ -23,7 +23,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <SyncProvider connected={Boolean(settings.sheet_id)} lastSyncedAt={settings.last_synced_at}>
       <div className="min-h-dvh flex flex-col">
-        <header className="sticky top-0 z-20 bg-bg/90 backdrop-blur border-b border-line pt-[env(safe-area-inset-top)]">
+        <header className="print:hidden sticky top-0 z-20 bg-bg/90 backdrop-blur border-b border-line pt-[env(safe-area-inset-top)]">
           <div className="mx-auto max-w-3xl flex items-center justify-between gap-4 h-14 px-[max(16px,env(safe-area-inset-left))]">
             <Link href="/collection" className="font-bold tracking-tight text-ink no-underline">
               Collection Tracker
@@ -42,11 +42,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
         </header>
 
-        <main className="flex-1 mx-auto w-full max-w-3xl px-[max(16px,env(safe-area-inset-left))] py-6 pb-28 md:pb-10">
+        <main className="flex-1 mx-auto w-full max-w-3xl px-[max(16px,env(safe-area-inset-left))] py-6 pb-28 md:pb-10 print:max-w-none print:p-0">
           {children}
         </main>
 
-        <div className="md:hidden fixed bottom-0 inset-x-0 z-20 bg-surface border-t border-line pb-[env(safe-area-inset-bottom)]">
+        <div className="print:hidden md:hidden fixed bottom-0 inset-x-0 z-20 bg-surface border-t border-line pb-[env(safe-area-inset-bottom)]">
           <NavBar variant="bottom" />
         </div>
       </div>
