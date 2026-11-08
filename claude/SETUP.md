@@ -44,7 +44,7 @@ Set up my Collection Tracker. Use the Google Sheets, Google Drive, Gmail, Supaba
    - Google Auth Platform > Get started: app name "Collection Tracker", my email as the support and contact email, audience External.
    - Branding (required before Google will publish): leave App logo empty. Application home page `https://<my app>.vercel.app`, privacy policy `https://<my app>.vercel.app/privacy`, terms of service `https://<my app>.vercel.app/terms`. Authorized domains: add `<my app>.vercel.app`. Save.
    - Audience > Test users: add my Google account. Then **Publish app** so the status is "In production" (this stops Google from signing me out every 7 days). Don't submit the app for verification.
-   - Data access > Add or remove scopes > Manually add scopes: `https://www.googleapis.com/auth/spreadsheets`, `https://www.googleapis.com/auth/drive.readonly`, and `https://www.googleapis.com/auth/drive.file`, then save.
+   - Data access: leave it empty. The app asks for its permissions at sign-in; declaring sensitive or restricted scopes here makes Google require a review.
    - Clients > Create client, type Web application, name "Collection Tracker". Authorized redirect URI: my Supabase project URL plus `/auth/v1/callback` (from the Supabase connector, or ask me). Authorized JavaScript origin: the Vercel address, if you created the Vercel project.
    - The client secret is shown only once. Leave that dialog open and tell me to copy the secret now. Don't copy, type, or repeat it anywhere. You can share the client ID. If you created the Vercel project, add `GOOGLE_CLIENT_ID` there.
 
