@@ -96,7 +96,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
         </div>
         {item.value_status === "estimate" && (
           <p className="text-sm rounded-lg bg-clay-soft text-clay-ink px-3 py-2">
-            This value isn&apos;t checked against real sales yet. Claude&apos;s background task prices it soon, or at 3:30 AM at the latest.
+            This value isn&apos;t checked against real sales yet. Claude prices it in the nightly run at 3:30 AM.
           </p>
         )}
         {history.length > 0 && (

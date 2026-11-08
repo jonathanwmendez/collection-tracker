@@ -30,7 +30,7 @@ export default async function AddPage() {
     <div className="flex flex-col gap-10">
       <section className="min-h-[55dvh] flex flex-col items-center justify-center text-center gap-4">
         <h1 className="text-2xl font-bold tracking-tight">Add items</h1>
-        <p className="text-muted max-w-sm">Take photos. Claude identifies, saves, and prices them in the background.</p>
+        <p className="text-muted max-w-sm">Take photos. Claude identifies, saves, and prices them overnight.</p>
         {settings.intake_url ? (
           <a href={settings.intake_url} target="_blank" rel="noopener" className={button}>
             Take photos
@@ -40,7 +40,7 @@ export default async function AddPage() {
             Add your Collection Intake link
           </Link>
         )}
-        <p className="text-sm text-muted max-w-sm">For a card, take the front, then the back. New items show up here in a few minutes.</p>
+        <p className="text-sm text-muted max-w-sm">For a card, take the front, then the back. New items show up here the next morning.</p>
       </section>
 
       <details className="rounded-2xl border border-line bg-surface p-4 group">

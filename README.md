@@ -16,8 +16,8 @@ A Google Sheet is the main copy of the collection. Three pieces work on it:
 
 | Piece | Runs on | What it does |
 |---|---|---|
-| **Collection Intake** | A Claude artifact | Take photos (or pick them from your library) and you're done. They upload to a Drive inbox and start the background task |
-| **Background task** | A Claude scheduled task, nightly at 3:30 AM, plus right after you take photos | Identifies new photos (pairs card fronts with backs, splits binder pages), checks for duplicates, saves each item to the sheet with a "Check this" note when unsure, and prices it from recent sold listings. Nightly, it also rechecks prices older than the repricing window (30 days by default) until 8:00 AM, adds PSA 9 and PSA 10 prices for ungraded cards, emails alerts for big moves, and logs each run with tokens used to a Price Log tab |
+| **Collection Intake** | A Claude artifact | Take photos (or pick them from your library) and you're done. They upload to a Drive inbox. No Claude usage |
+| **Background task** | A Claude scheduled task, nightly at 3:30 AM | Identifies new photos (pairs card fronts with backs, splits binder pages), checks for duplicates, saves each item to the sheet with a "Check this" note when unsure, and then prices it from recent sold listings. It also rechecks prices older than the repricing window (30 days by default) until 8:00 AM, adds PSA 9 and PSA 10 prices for ungraded cards, emails alerts for big moves, and logs each run with tokens used to a Price Log tab |
 | **This web app** | Vercel + Supabase | Syncs from the sheet every morning and whenever you open it, to browse, search, edit, analyze, and share the collection |
 
 Identifying and pricing run inside Claude, on a Claude subscription. The web app makes no paid AI calls.
@@ -46,8 +46,6 @@ About 30 minutes. Do the steps in order: each one uses an address from the one b
 | Gmail | Background task | Price alert emails. Optional: without it, alerts go in the Price Log tab instead |
 | Supabase | Setup | Optional. Runs the database migrations for you (create the Supabase project in step 2.1 first) |
 | Vercel | Setup | Optional. Creates the Vercel project and adds the variables that aren't secret |
-
-Collection Intake starts the background task right after you take photos, using Claude's own scheduled task tools. Nothing to connect for that.
 
 Google Cloud has no connector. If Claude can use a browser where you're signed in to Google Cloud (such as Claude in Chrome), the setup prompt does step 3 for you, except copying the client secret.
 

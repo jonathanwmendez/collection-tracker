@@ -27,7 +27,7 @@ Set up my Collection Tracker. Use the Google Sheets, Google Drive, Gmail, Supaba
 
 3. **Price check.** Create a scheduled task named "Collection Tracker pricing" that runs every day at 3:30 AM my time, using the prompt in `claude/price-check.md` with {{SHEET_ID}}, {{TIME_ZONE}}, {{PHOTOS_FOLDER_ID}}, {{INBOX_FOLDER_ID}}, and {{EMAIL}} (my Gmail address, for price alerts) filled in. Connect it to Google Sheets, Google Drive, and Gmail (if I have Gmail connected). It also turns photos from Collection Intake into rows.
 
-4. **Collection Intake.** Publish `claude/collection-intake.html` as an artifact titled "Collection Intake", with every {{...}} placeholder filled in: the sheet ID, the Inbox folder ID, and the price check task ID. Give it one capability: `mcp` with Google Drive `create_file` and your scheduled task tool `fire_trigger`. Pin it.
+4. **Collection Intake.** Publish `claude/collection-intake.html` as an artifact titled "Collection Intake", with every {{...}} placeholder filled in: the sheet ID and the Inbox folder ID. Give it one capability: `mcp` with Google Drive `create_file`. Pin it.
 
 5. **Database (only if the Supabase connector is on).** List my Supabase projects and use the one named "collection-tracker" (ask me if there isn't exactly one match; never create a project). Check which migrations are already applied, then apply each remaining file in `supabase/migrations/` in number order, one migration per file, named after the file. Then run the security advisor and tell me about any warnings. If the connector is off, skip this step and remind me to run the migrations myself (README step 2.2).
 

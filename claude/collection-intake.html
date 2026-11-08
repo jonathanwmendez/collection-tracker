@@ -66,7 +66,7 @@ body.shooting .wrap{padding-bottom:150px}
 <div class="wrap">
   <header>
     <h1>Collection Intake</h1>
-    <p class="intro">Take photos. Claude identifies each item, pairs card fronts with backs, saves them to your sheet, and prices them. <a href="https://docs.google.com/spreadsheets/d/{{SHEET_ID}}/edit" target="_blank" rel="noopener">Open the sheet</a></p>
+    <p class="intro">Take photos. Tonight, Claude identifies each item, pairs card fronts with backs, saves them to your sheet, and prices them. <a href="https://docs.google.com/spreadsheets/d/{{SHEET_ID}}/edit" target="_blank" rel="noopener">Open the sheet</a></p>
   </header>
 
   <div id="banners"></div>
@@ -98,7 +98,6 @@ body.shooting .wrap{padding-bottom:150px}
 <script>
 (() => {
 const INBOX = "{{INBOX_FOLDER_ID}}";
-const TRIGGER = "{{PRICE_CHECK_TASK_ID}}";
 
 // ---------- tiny DOM helper ----------
 function h(tag, attrs, ...kids){
@@ -168,7 +167,7 @@ function toBase64(blob){
 const pad = n => String(n).padStart(3, "0");
 const sessionStamp = (() => { const d = new Date(), z = n => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())} ${z(d.getHours())}-${z(d.getMinutes())}-${z(d.getSeconds())}`; })();
-let seq = 0, uploaded = 0, unsent = 0, idle = null, doneAsked = false;
+let seq = 0, uploaded = 0, doneAsked = false;
 const photos = [];
 
 const cam = document.getElementById("cam"), lib = document.getElementById("file");
@@ -217,7 +216,7 @@ async function upload(p){
     }
     await mcp.callTool("Google Drive", "create_file",
       {title, parentId: INBOX, contentMimeType: "image/jpeg", disableConversionToGoogleType: true, base64Content: content});
-    p.state = "ok"; uploaded++; unsent++; err.hidden = true;
+    p.state = "ok"; uploaded++; err.hidden = true;
   } catch (e){
     p.state = "fail"; err.hidden = false;
     err.textContent = e?.code ? mcpWhy(e) : "A photo couldn't be prepared. Try it again or take a new one.";
@@ -234,28 +233,13 @@ function showBar(){
   document.getElementById("count").innerHTML = parts.join(" · ");
 }
 
-// Start the background task when you tap Done, or by itself a minute after the last upload.
-// Anything it misses is picked up by the nightly run.
-function settle(){
-  clearTimeout(idle);
-  if (photos.some(p => p.state === "up")) return;
-  if (doneAsked) finish(true);
-  else if (unsent) idle = setTimeout(() => finish(false), 60000);
-}
-async function finish(tapped){
-  clearTimeout(idle);
-  if (photos.some(p => p.state === "up")){ if (tapped){ doneAsked = true; banner("Still uploading. Claude starts as soon as the last photo is up."); } return; }
+// Nothing runs now: the nightly task (3:30 AM) turns the inbox photos into rows, then prices them.
+function settle(){ if (doneAsked && !photos.some(p => p.state === "up")) finish(true); }
+function finish(tapped){
+  if (photos.some(p => p.state === "up")){ doneAsked = true; banner("Still uploading. Keep this page open until the last photo is sent."); return; }
   doneAsked = false;
-  if (!unsent){ if (tapped) done(); return; }
-  const n = unsent; unsent = 0;
-  try {
-    await mcp.callTool("Claude Code Remote", "fire_trigger", {trigger_id: TRIGGER, text: `New photos in the Collection Intake inbox (${n}).`});
-    if (tapped) done();
-    banner(`Claude is on it. Your items show up in the sheet and the app in a few minutes.`, "ok");
-  } catch {
-    if (tapped) done();
-    banner("The photos are saved. Claude adds them tonight at 3:30 AM.", "ok");
-  }
+  if (tapped) done();
+  if (uploaded) banner(`${uploaded} photo${uploaded === 1 ? "" : "s"} saved. Claude adds and prices them tonight at 3:30 AM.`, "ok");
 }
 function done(){
   document.getElementById("bar").hidden = true; document.body.classList.remove("shooting");
