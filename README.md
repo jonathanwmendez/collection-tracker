@@ -59,7 +59,7 @@ Paste [`claude/SETUP.md`](claude/SETUP.md) into a new Claude conversation, after
 ### 2. Supabase
 
 1. Create a project at [supabase.com](https://supabase.com). Under **Security**: keep **Enable Data API** on, turn **Automatically expose new tables** off, turn **Enable automatic RLS** on.
-2. **SQL Editor:** run the files in [`supabase/migrations/`](supabase/migrations) in order, `0001` through `0010`. Skip this if Claude already ran them in step 1 with the Supabase connector.
+2. **SQL Editor:** run the files in [`supabase/migrations/`](supabase/migrations) in order, `0001` through `0011`. Skip this if Claude already ran them in step 1 with the Supabase connector.
 3. **Settings > API Keys:** copy the project URL, a publishable key, and a secret key.
 
 ### 3. Google Cloud
@@ -102,7 +102,7 @@ To use a different `.vercel.app` address, add it under **Settings > Domains**. T
 
 ### 6. First sign-in
 
-Open your Vercel address and sign in with Google. You'll see "Google hasn't verified this app": choose **Continue** and allow access. The setup checklist opens: paste the sheet and Collection Intake links from step 1 and save. The first sync starts on its own.
+Open your Vercel address and sign in with Google. You'll see "Google hasn't verified this app": tap **Advanced**, then **Go to** your app, and allow access with every box checked. The setup checklist opens: paste the sheet and Collection Intake links from step 1 and save. The first sync starts on its own.
 
 ## Adding people
 
@@ -149,12 +149,13 @@ For local sign-in, also add `http://localhost:3000` to the Google client's JavaS
 | `src/components/insurance-report.tsx` | The printable insurance report, shared with the demo |
 | `src/lib/paged.ts` | Reads past Supabase's 1,000-row limit |
 | `src/lib/access.ts` | Owners, invites, and roles |
+| `src/app/privacy/`, `src/app/terms/` | The Privacy Policy and Terms of Service that Google's Branding page links to |
 | `src/lib/shares.ts`, `src/app/s/` | Share links and the public view-only pages |
 | `src/app/api/` | Sync, daily sync and pricing, scanning, item edit/delete/reprice/price/photos, settings, export, access requests, admin, account deletion, photo previews |
 | `supabase/migrations/` | Tables: items, photos, price_checks, value_snapshots, settings, google_tokens, members, access_requests, shares |
 | `claude/` | Setup prompt, Collection Intake page, and the background task prompt (`price-check.md`) |
 | `vercel.json` | Daily sync schedule, and a redirect from this deployment's old address (safe to remove in a fork) |
-| `tests/` | Unit tests for row parsing, card text and card-type detection, item outlining, price lookups, repricing rules, access and share rules, collection math, and CSV export |
+| `tests/` | Unit tests for row parsing, card text and card-type detection, identifying scans, item outlining, the demo scanner, price lookups, repricing rules, access and share rules, collection math, and CSV export |
 
 ## Security
 

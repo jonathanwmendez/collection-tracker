@@ -9,7 +9,7 @@ export function supabaseConfigured(): boolean {
 /**
  * Google access requested at sign-in:
  * - spreadsheets: read and update the Collection Tracker sheet
- * - drive.readonly: show the photos Collection Intake saved to Drive
+ * - drive.readonly: show the photos the sheet links to, including ones Claude's nightly run saved to Drive
  */
 export const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/spreadsheets",

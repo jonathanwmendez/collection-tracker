@@ -88,7 +88,7 @@ export function ValueDashboard({
             </span>
           )}
           <span className="text-sm text-muted">
-            {verifiedShare}% of it checked against real sales ({money(t.verified)})
+            {verifiedShare}% of it priced from real sales or card price guides ({money(t.verified)})
           </span>
         </div>
         <div className="rounded-2xl bg-surface border border-line p-4 flex flex-col gap-1">

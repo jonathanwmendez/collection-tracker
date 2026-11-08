@@ -127,7 +127,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
         )}
         {item.value_status === "estimate" && (
           <p className="text-sm rounded-lg bg-clay-soft text-clay-ink px-3 py-2">
-            This value isn&apos;t checked against real sales yet. Claude prices it in the nightly run at 3:30 AM.
+            This value isn&apos;t checked yet. Trading cards get a free price each morning; everything else is priced from real sales in Claude&apos;s nightly run at 3:30 AM.
           </p>
         )}
         {history.length > 0 && (

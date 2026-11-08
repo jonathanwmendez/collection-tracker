@@ -50,4 +50,4 @@ Set up my Collection Tracker. Use the Google Sheets, Google Drive, Gmail, Supaba
 
    If you can't use a browser, skip this step (README step 3).
 
-8. **Finish** by giving me the sheet's link and the Collection Intake link, to paste into the web app's Settings page. Say whether the database is set up, give me the Vercel address if you created the project, and list which secrets I still need to add myself and where.
+8. **Finish** by giving me the sheet's link and the Collection Intake link, to paste into the web app's Settings page. Say whether the database is set up, give me the Vercel address if you created the project, and list which secrets I still need to add myself and where, including the optional eBay keys for sports card asking prices (README step 4).

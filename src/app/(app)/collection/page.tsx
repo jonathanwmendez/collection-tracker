@@ -76,7 +76,7 @@ export default async function CollectionPage({ searchParams }: { searchParams: P
           )}
         </section>
       ) : items.length === 0 ? (
-        <EmptyState title="No items yet" body="Items you add with Collection Intake, or type into the sheet, show up here after a sync.">
+        <EmptyState title="No items yet" body="Items you scan with Add, or type into the sheet, show up here.">
           <Link href="/scan" className="mt-1 inline-flex min-h-11 items-center rounded-xl bg-navy px-5 font-medium text-navy-ink no-underline">
             Add an item
           </Link>

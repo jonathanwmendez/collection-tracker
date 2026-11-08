@@ -72,7 +72,7 @@ export default async function CategoryPage({
       </div>
 
       {all.length === 0 ? (
-        <EmptyState title={`No ${category.name} yet`} body="Add items with Collection Intake, or type them into this tab of your sheet.">
+        <EmptyState title={`No ${category.name} yet`} body="Scan items with Add, or type them into this tab of your sheet.">
           <Link href="/scan" className="mt-1 inline-flex min-h-11 items-center rounded-xl bg-navy px-5 font-medium text-navy-ink no-underline">
             Add an item
           </Link>

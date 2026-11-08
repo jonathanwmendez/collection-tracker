@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { matchingListings, median } from "../src/lib/ebay";
-import { identifyScan } from "../src/lib/identify";
+import { identifyAuto, identifyScan } from "../src/lib/identify";
 
 const card = { name: "Michael Jordan", details: { Year: "1990", "Brand / Set": "Fleer", "Card #": "26", Grade: "" } };
 const listing = (title: string, value: number) => ({ title, price: { value: String(value), currency: "USD" } });
@@ -53,4 +53,51 @@ test("a sports card back becomes a row with a Check this note when parts are mis
   assert.equal(c!.details["Brand / Set"], "Upper Deck");
   assert.equal(c!.problem, "couldn't read the card number from the back");
   assert.equal(c!.condition, "Raw");
+});
+
+test("works out the kind of card from the text, then matches it (Scan page default)", async () => {
+  const calls: string[] = [];
+  const fake = (async (url: string) => {
+    calls.push(String(url));
+    return new Response(
+      JSON.stringify({ id: "abc", name: "Ragavan, Nimble Pilferer", set: "mh2", set_name: "Modern Horizons 2", collector_number: "138", rarity: "mythic", released_at: "2021-06-18", prices: { usd: "46.10" } }),
+      { status: 200 },
+    );
+  }) as typeof fetch;
+  const r = await identifyAuto(
+    {
+      front: [
+        { text: "Ragavan, Nimble Pilferer", height: 20, y: 0 },
+        { text: "Legendary Creature — Monkey Pirate", height: 12, y: 300 },
+        { text: "138/303 M", height: 10, y: 500 },
+        { text: "MH2 • EN Illus. Simon Dominic", height: 10, y: 520 },
+        { text: "™ & © 2021 Wizards of the Coast", height: 10, y: 540 },
+      ],
+      back: [],
+      hasBack: false,
+    },
+    fake,
+  );
+  assert.equal(r.kind, "magic");
+  assert.equal(calls[0], "https://api.scryfall.com/cards/mh2/138");
+  assert.equal(r.candidates[0]!.name, "Ragavan, Nimble Pilferer");
+});
+
+test("with no clear signs, a card with a back is read as a sports card", async () => {
+  const noFetch = (async () => {
+    throw new Error("no network in this test");
+  }) as unknown as typeof fetch;
+  const r = await identifyAuto({ front: [], back: [{ text: "KEN GRIFFEY JR.", height: 30, y: 0 }], hasBack: true }, noFetch);
+  assert.equal(r.kind, "sports");
+  assert.equal(r.candidates[0]!.name, "Ken Griffey Jr.");
+});
+
+test("with no clear signs and no back, the selector's kind is used", async () => {
+  const calls: string[] = [];
+  const fake = (async (url: string) => {
+    calls.push(String(url));
+    return new Response(JSON.stringify({ data: [] }), { status: 200 });
+  }) as typeof fetch;
+  await identifyAuto({ front: [{ text: "Charizard", height: 30, y: 0 }], back: [], hasBack: false, hint: "pokemon" }, fake);
+  assert.ok(calls.some((u) => u.includes("pokemontcg.io")), calls.join(", "));
 });

@@ -177,7 +177,6 @@ export function sampleCamera(opts: { wantBack: () => boolean; captures: () => nu
   };
   const draw = () => {
     const now = performance.now();
-    const sample = SAMPLES[index % SAMPLES.length]!;
     // The scanner took this side: lift the card a moment later.
     if (side && opts.captures() !== seen && !takenAt) takenAt = now;
     if (side && takenAt && now - takenAt > 500) {

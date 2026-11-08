@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export const metadata = {
   title: "Demo · Collection Tracker",
-  description: "A sample collection in Collection Tracker: values checked against real sales, price history, profit, and grading candidates.",
+  description: "A sample collection in Collection Tracker: a scanner you can try, values from real sales and card price guides, price history, profit, and grading candidates.",
 };
 
 const tab = "min-h-9 inline-flex items-center rounded-full px-3 text-sm font-medium no-underline";
