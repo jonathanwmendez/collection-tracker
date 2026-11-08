@@ -5,8 +5,8 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL, supabaseConfigured } from "./en
 
 const PUBLIC_PATHS = ["/login", "/auth"];
 // Open to anyone, signed in or not: share links (checked by their token), access requests, the demo,
-// and the daily sync (checked by CRON_SECRET).
-const OPEN_PATHS = ["/s", "/api/share", "/api/access-requests", "/demo", "/api/cron"];
+// the daily sync (checked by CRON_SECRET), and the Privacy Policy and Terms (Google links to them).
+const OPEN_PATHS = ["/s", "/api/share", "/api/access-requests", "/demo", "/api/cron", "/privacy", "/terms"];
 
 /** Refreshes the session cookie on every request and keeps out anyone who isn't signed in and allowed. */
 export async function updateSession(request: NextRequest) {

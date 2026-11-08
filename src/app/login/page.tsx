@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { RequestAccess } from "./request-access";
 import { SignInButton } from "./sign-in-button";
 import { supabaseConfigured } from "@/lib/supabase/env";
@@ -25,7 +26,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           </div>
           <h1 className="text-3xl font-bold tracking-tight text-balance">Collection Tracker</h1>
           <p className="text-muted">
-            Photograph an item, check what Claude found, and it&apos;s cataloged with a price verified against real sales.
+            Scan your cards and collectibles, keep them in your own Google Sheet, and track what they&apos;re worth from real sales and card
+            price databases.
           </p>
         </div>
 
@@ -40,8 +42,12 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <RequestAccess open={error === "not_allowed"} />
 
         <p className="text-xs text-muted">
-          Google will ask to let the app see your Drive files and edit your sheets. The app only opens your Collection Tracker sheet and the
-          photos it links to, and never deletes anything.
+          Google will ask to let the app see your Drive files, save files it creates, and edit your sheets. The app only opens your Collection
+          Tracker sheet and the photos it links to, saves your scans to its own folder, and never deletes anything.
+        </p>
+
+        <p className="text-xs text-muted">
+          <Link href="/demo">Try the demo</Link> · <Link href="/privacy">Privacy Policy</Link> · <Link href="/terms">Terms of Service</Link>
         </p>
       </div>
     </main>

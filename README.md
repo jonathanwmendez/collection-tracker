@@ -68,20 +68,21 @@ If Claude did this in step 1, skip to step 4. You still need the client secret y
 
 1. In [Google Cloud Console](https://console.cloud.google.com), create a project and enable the **Google Sheets API** and **Google Drive API**.
 2. **Google Auth Platform > Get started:** app name, support email, audience **External**, contact email.
-3. **Audience > Test users:** add your Google account. Then **Publish app** so the status is **In production**. Don't submit for verification. In production, Google stops signing you out every 7 days.
-4. **Data access > Add or remove scopes > Manually add scopes:** paste the three scopes below, then **Add to table**, **Update**, **Save**.
+3. **Branding** (fill this in once step 4 gives you the app's address): Google won't publish the app until this page is filled in. Leave **App logo** empty (a logo makes Google require verification). Use your app's address for the links: home page `https://<your-app>.vercel.app`, privacy policy `https://<your-app>.vercel.app/privacy`, terms of service `https://<your-app>.vercel.app/terms`. Under **Authorized domains**, add `<your-app>.vercel.app`. Save.
+4. **Audience > Test users:** add your Google account. Once Branding is saved, **Publish app** so the status is **In production**. Don't submit for verification. In production, Google stops signing you out every 7 days.
+5. **Data access > Add or remove scopes > Manually add scopes:** paste the three scopes below, then **Add to table**, **Update**, **Save**.
    ```
    https://www.googleapis.com/auth/spreadsheets
    https://www.googleapis.com/auth/drive.readonly
    https://www.googleapis.com/auth/drive.file
    ```
-5. **Clients > Create client**, type **Web application**. Leave the origins for now. Under **Authorized redirect URIs**, add `https://<project-ref>.supabase.co/auth/v1/callback` (your Supabase URL plus `/auth/v1/callback`). Copy the client ID and secret. Google may show the secret only once.
+6. **Clients > Create client**, type **Web application**. Leave the origins for now. Under **Authorized redirect URIs**, add `https://<project-ref>.supabase.co/auth/v1/callback` (your Supabase URL plus `/auth/v1/callback`). Copy the client ID and secret. Google may show the secret only once.
 
 ### 4. Vercel
 
 1. At [vercel.com](https://vercel.com), **Add New > Project** and import this repository.
 2. Add the environment variables below, then deploy. If Claude created the project in setup step 1, skip 4.1. Claude's last message lists the variables it added. Add the rest (at least `SUPABASE_SECRET_KEY` and `GOOGLE_CLIENT_SECRET`) and redeploy. Note the address, like `https://collection-tracker-xxxx.vercel.app`.
-3. Back in the Google client from step 3.5, add that address under **Authorized JavaScript origins**.
+3. Back in the Google client from step 3.6, add that address under **Authorized JavaScript origins**. Then finish **Branding** (step 3.3) and **Publish app** (step 3.4).
 
 | Variable | Value |
 |---|---|
