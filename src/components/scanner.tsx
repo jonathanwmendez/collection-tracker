@@ -7,6 +7,7 @@ import { categoryByName } from "@/lib/categories";
 import type { Candidate } from "@/lib/identify";
 import { pendingScans, putScan, removeScan, type QueuedScan } from "@/lib/scan-queue";
 import { detectKind, type CardKind, type OcrLine } from "@/lib/card-text";
+import { detectItem } from "@/lib/outline";
 
 // ---------- kinds of card ----------
 
@@ -61,20 +62,29 @@ const SHAPE_LABEL: Record<Shape, string> = { card: "Card", sideways: "Sideways c
 // Height divided by width.
 const RATIO: Record<Exclude<Shape, "full">, number> = { card: 1.4, sideways: 1 / 1.4, slab: 1.7 };
 
-/** The frame on screen, centered on the screen and clear of the top buttons and the shutter. */
+/** The frame on screen, centered in the space between the top controls (and prompt) and the bottom controls. */
 function guideRect(v: View, shape: Shape = "card"): Rect {
-  const cy = v.sh / 2;
-  // As tall as fits on both sides of the middle.
-  const maxH = Math.max(1, 2 * Math.min(cy - v.top, v.sh - v.bottom - cy));
-  if (shape === "full") return { x: v.sw * 0.04, y: cy - maxH / 2, w: v.sw * 0.92, h: maxH };
+  const bh = Math.max(1, v.sh - v.top - v.bottom);
+  if (shape === "full") return { x: v.sw * 0.04, y: v.top, w: v.sw * 0.92, h: bh };
   const ratio = RATIO[shape];
   let gw = v.sw * (shape === "sideways" ? 0.92 : 0.86);
   let gh = gw * ratio;
-  if (gh > maxH) {
-    gh = maxH;
+  if (gh > bh) {
+    gh = bh;
     gw = gh / ratio;
   }
-  return { x: (v.sw - gw) / 2, y: cy - gh / 2, w: gw, h: gh };
+  return { x: (v.sw - gw) / 2, y: v.top + (bh - gh) / 2, w: gw, h: gh };
+}
+
+/** A box a little bigger than the item, kept inside the space between the controls. */
+function padBox(b: Rect, v: View): Rect {
+  const px = b.w * 0.04;
+  const py = b.h * 0.04;
+  const x = Math.max(0, b.x - px);
+  const y = Math.max(v.top, b.y - py);
+  const r = Math.min(v.sw, b.x + b.w + px);
+  const bottom = Math.min(v.sh - v.bottom, b.y + b.h + py);
+  return { x, y, w: Math.max(1, r - x), h: Math.max(1, bottom - y) };
 }
 
 /**
@@ -217,7 +227,14 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
   const deleted = useRef(new Set<string>());
   const settingsOpen = panel !== null;
   const setSettingsOpen = (open: boolean) => setPanel(open ? "settings" : null);
+  // Auto capture: takes the photo when the item holds still. Auto snap: the frame follows the item's outline.
   const [auto, setAuto] = useState(true);
+  const [outline, setOutline] = useState(true);
+  const [itemBox, setItemBox] = useState<Rect | null>(null);
+  const itemBoxRef = useRef<Rect | null>(null);
+  itemBoxRef.current = itemBox;
+  const outlineRef = useRef(outline);
+  outlineRef.current = outline;
   const [step, setStep] = useState<"front" | "back">("front");
   const [mode, setMode] = useState<Mode>("auto");
   const [sides, setSides] = useState<Sides>("both");
@@ -259,6 +276,7 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
   const topBar = useRef<HTMLDivElement>(null);
   const bottomBar = useRef<HTMLDivElement>(null);
   const shutterRow = useRef<HTMLDivElement>(null);
+  const promptRef = useRef<HTMLParagraphElement>(null);
 
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
@@ -276,13 +294,14 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
       const s = JSON.parse(localStorage.getItem("scan-session") ?? "{}");
       if (typeof s.location === "string") setLocation(s.location);
       if (typeof s.auto === "boolean") setAuto(s.auto);
+      if (typeof s.outline === "boolean") setOutline(s.outline);
     } catch {}
   }, []);
   useEffect(() => {
     try {
-      localStorage.setItem("scan-session", JSON.stringify({ location, auto }));
+      localStorage.setItem("scan-session", JSON.stringify({ location, auto, outline }));
     } catch {}
-  }, [location, auto]);
+  }, [location, auto, outline]);
 
   const update = useCallback((id: string, patch: Partial<Result>) => setResults((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r))), []);
 
@@ -558,7 +577,8 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
     if (!vw) return;
     // Hardware zoom already narrows the picture; on-screen zoom is applied here.
     const dz = zoomCaps.current ? 1 : zoomRef.current;
-    const blob = await frameToBlob(v, toVideo(guideRect(vw, shapeRef.current), v, vw, dz), SAVE_PX);
+    const area = outlineRef.current && itemBoxRef.current ? padBox(itemBoxRef.current, vw) : guideRect(vw, shapeRef.current);
+    const blob = await frameToBlob(v, toVideo(area, v, vw, dz), SAVE_PX);
     setFlash(true);
     setTimeout(() => setFlash(false), 120);
     navigator.vibrate?.(30);
@@ -586,15 +606,60 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
     offerRetake("back");
   }, [finishItem, checkFront, offerRetake]);
 
-  // Auto-snap: when the picture holds still and in focus for half a second, and differs from the last photo.
+  // Every 150 ms: auto snap outlines the item, and auto capture takes the photo when the picture holds
+  // still and in focus for half a second and differs from the last photo.
   useEffect(() => {
-    if (phase !== "camera" || !auto || settingsOpen || tips !== null) {
+    if (phase !== "camera" || (!auto && !outline) || settingsOpen || tips !== null) {
       setSteady(0);
       setBlurry(false);
+      setItemBox(null);
       return;
     }
     const c = document.createElement("canvas");
     const ctx = c.getContext("2d", { willReadFrequently: true })!;
+    // Auto snap looks at the whole picture between the controls, small.
+    const oc = document.createElement("canvas");
+    const octx = oc.getContext("2d", { willReadFrequently: true })!;
+    let smooth: Rect | null = null;
+    let missing = 0;
+    const findItem = () => {
+      const v = video.current;
+      const vw = viewRef.current;
+      if (!v || !v.videoWidth || !vw) return;
+      const band = { x: 0, y: vw.top, w: vw.sw, h: Math.max(1, vw.sh - vw.top - vw.bottom) };
+      const r = toVideo(band, v, vw, zoomCaps.current ? 1 : zoomRef.current);
+      const OW = 120;
+      oc.width = OW;
+      oc.height = Math.max(16, Math.round((OW * r.h) / r.w));
+      octx.drawImage(v, r.x, r.y, r.w, r.h, 0, 0, oc.width, oc.height);
+      const d = octx.getImageData(0, 0, oc.width, oc.height).data;
+      const g = new Uint8ClampedArray(d.length / 4);
+      for (let i = 0; i < g.length; i++) g[i] = (d[i * 4]! * 3 + d[i * 4 + 1]! * 6 + d[i * 4 + 2]!) / 10;
+      const box = detectItem(g, oc.width, oc.height);
+      if (!box) {
+        // Keep the last outline briefly, so it doesn't flicker.
+        if (++missing >= 4 && smooth) {
+          smooth = null;
+          setItemBox(null);
+        }
+        return;
+      }
+      missing = 0;
+      const k = band.w / oc.width;
+      const found = { x: box.x * k, y: band.y + box.y * k, w: box.w * k, h: box.h * k };
+      const a = 0.5;
+      smooth = smooth
+        ? {
+            x: smooth.x + (found.x - smooth.x) * a,
+            y: smooth.y + (found.y - smooth.y) * a,
+            w: smooth.w + (found.w - smooth.w) * a,
+            h: smooth.h + (found.h - smooth.h) * a,
+          }
+        : found;
+      const cur = itemBoxRef.current;
+      if (!cur || Math.abs(cur.x - smooth.x) + Math.abs(cur.y - smooth.y) + Math.abs(cur.w - smooth.w) + Math.abs(cur.h - smooth.h) > 3)
+        setItemBox({ ...smooth });
+    };
     let prev: Uint8ClampedArray | null = null;
     let stillFor = 0;
     let blurFor = 0;
@@ -652,6 +717,8 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
     };
     const t = setInterval(async () => {
       if (busy) return;
+      if (outline) findItem();
+      if (!auto) return;
       const s = sample();
       if (!s) return;
       const g = half(s.g, s.w, s.h);
@@ -685,7 +752,7 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
       clearInterval(t);
       setSteady(0);
     };
-  }, [phase, auto, settingsOpen, tips, capture]);
+  }, [phase, auto, outline, settingsOpen, tips, capture]);
 
   const opening = useRef(false);
   const start = useCallback(async () => {
@@ -823,11 +890,16 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
       if (!el) return;
       // The frame is centered on the screen, clear of the top buttons and the shutter row. The prompt, Retake,
       // and the result card float over the picture.
-      setView({ sw: el.clientWidth, sh: el.clientHeight, top: (topBar.current?.offsetHeight ?? 0) + 8, bottom: (shutterRow.current?.offsetHeight ?? 0) + 20 });
+      setView({
+        sw: el.clientWidth,
+        sh: el.clientHeight,
+        top: (topBar.current?.offsetHeight ?? 0) + (promptRef.current?.offsetHeight ?? 28) + 10,
+        bottom: (bottomBar.current?.offsetHeight ?? 0) + 6,
+      });
     };
     place();
     const ro = new ResizeObserver(place);
-    [stage.current, topBar.current, bottomBar.current, shutterRow.current].forEach((el) => el && ro.observe(el));
+    [stage.current, topBar.current, bottomBar.current, shutterRow.current, promptRef.current].forEach((el) => el && ro.observe(el));
     window.addEventListener("resize", place);
     return () => {
       ro.disconnect();
@@ -900,7 +972,11 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
   const round = "flex h-11 w-11 items-center justify-center rounded-full bg-black/50 backdrop-blur";
   const toggleAuto = () => {
     setAuto(!auto);
-    setHint(auto ? "Auto snap off. Tap the button for each photo." : "Auto snap on. Hold each item still.");
+    setHint(auto ? "Auto capture off. Tap to shoot." : "Auto capture on");
+  };
+  const toggleOutline = () => {
+    setOutline(!outline);
+    setHint(outline ? "Auto snap off" : "Auto snap on");
   };
   return (
     <div ref={stage} className="fixed inset-x-0 z-30 overflow-hidden bg-black text-white" style={{ top: frame.top, bottom: frame.bottom }}>
@@ -915,22 +991,27 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
         className="absolute inset-0 h-full w-full touch-none object-cover"
         style={digital ? { transform: `scale(${zoom})` } : undefined}
       />
-      {view && <Guide rect={guideRect(view, shape)} steady={steady} />}
+      {view && <Guide rect={outline && itemBox ? padBox(itemBox, view) : guideRect(view, shape)} steady={steady} found={Boolean(outline && itemBox)} />}
       {flash && <div className="absolute inset-0 bg-white/70" />}
       <div ref={topBar} className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-2">
         <div className="flex flex-1 basis-0 gap-2">
           <button
             type="button"
-            role="switch"
-            onClick={toggleAuto}
-            aria-checked={auto}
-            aria-label="Take photos automatically"
-            className={`flex h-11 items-center gap-2 rounded-full pl-3 pr-1.5 text-sm font-bold backdrop-blur ${auto ? "bg-ok text-white" : "bg-black/50 text-white/80"}`}
+            onClick={toggleOutline}
+            aria-pressed={outline}
+            aria-label={outline ? "Auto snap is on: the frame follows the item" : "Auto snap is off"}
+            className={`${round} ${outline ? "!bg-white text-black" : ""}`}
           >
-            Auto
-            <span className={`relative h-6 w-10 rounded-full transition-colors ${auto ? "bg-white/35" : "bg-white/20"}`}>
-              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-[left] ${auto ? "left-[18px]" : "left-0.5"}`} />
-            </span>
+            <OutlineIcon off={!outline} />
+          </button>
+          <button
+            type="button"
+            onClick={toggleAuto}
+            aria-pressed={auto}
+            aria-label={auto ? "Auto capture is on: photos are taken on their own" : "Auto capture is off"}
+            className={`${round} ${auto ? "!bg-white text-black" : ""}`}
+          >
+            <AutoCaptureIcon off={!auto} />
           </button>
         </div>
         <label className="relative shrink-0">
@@ -968,81 +1049,85 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
         </div>
       </div>
       <p
-        className="absolute inset-x-0 px-4 text-center text-lg font-medium [text-shadow:0_1px_4px_rgba(0,0,0,0.8)]"
-        style={{ top: view ? view.top + 4 : 64 }}
+        ref={promptRef}
+        className="absolute inset-x-0 truncate px-4 text-center text-base font-medium leading-7 [text-shadow:0_1px_4px_rgba(0,0,0,0.8)]"
+        style={{ top: (topBar.current?.offsetHeight ?? 60) + 2 }}
         aria-live="polite"
       >
-        {prompt}
+        {prompt || "\u00a0"}
       </p>
       <div
         ref={bottomBar}
         className="absolute inset-x-0 bottom-0 px-4 pt-6 pb-3 flex flex-col gap-3 bg-gradient-to-t from-black/75 via-black/45 to-transparent"
       >
-        <div className="flex min-h-9 items-center justify-center gap-2">
-          {zoom !== 1 && (
-            <button
-              type="button"
-              onClick={() => setZoomLevel(1)}
-              aria-label="Zoom back out"
-              className="min-h-9 rounded-full bg-black/50 px-3 text-sm font-medium tabular-nums backdrop-blur"
-            >
-              {zoom.toFixed(1)}×
-            </button>
-          )}
-          {retake && (
-            <button type="button" onClick={doRetake} className="min-h-9 rounded-full bg-white px-4 text-sm font-medium text-black">
-              Retake
-            </button>
-          )}
-          {step === "back" && (
-            <button
-              type="button"
-              onClick={() => {
-                setStep("front");
-                setHint("No back. Next one.");
-              }}
-              className="min-h-9 rounded-full bg-black/50 px-4 text-sm font-medium backdrop-blur"
-            >
-              Skip the back
-            </button>
-          )}
-        </div>
-        {/* The latest scan: what it is and its price, or what it needs. Tap for the full list. */}
-        <div className="min-h-14">
-          {latest && (
-            <button
-              type="button"
-              onClick={() => setPanel("review")}
-              className="flex w-full items-center gap-3 rounded-2xl bg-black/60 p-2 pr-3 text-left backdrop-blur"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={latest.thumb} alt="" className="h-12 w-9 shrink-0 rounded object-cover" />
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-sm font-medium">{latest.status === "waiting" || latest.status === "reading" ? "Reading…" : latest.label}</span>
-                <span className={`truncate text-xs ${["pick", "error", "offline"].includes(latest.status) ? "text-warn" : "text-white/70"}`}>
-                  {latest.status === "saved"
-                    ? latest.merged
-                      ? "Added to one you had"
-                      : latest.problem
-                        ? "Saved · check this"
-                        : "Saved"
-                    : latest.status === "pick"
-                      ? "Tap to pick the right one"
-                      : latest.status === "offline"
-                        ? "Saves when you're back online"
-                        : latest.status === "error"
-                          ? "Couldn't save. Tap for details."
-                          : latest.status === "saving"
-                            ? "Saving…"
-                            : `${counts.saved} saved`}
-                </span>
-              </span>
-              {latest.status === "saved" && (
-                <span className="shrink-0 text-right">
-                  <span className="block font-mono text-base font-medium tabular-nums">{latest.price ? money(latest.price) : "No price yet"}</span>
-                </span>
+        {/* One row: Retake, Skip the back, and zoom when they apply; otherwise the latest scan (tap for the full list). */}
+        <div className="h-14">
+          {retake || step === "back" || zoom !== 1 ? (
+            <div className="flex h-full items-center justify-center gap-2">
+              {zoom !== 1 && (
+                <button
+                  type="button"
+                  onClick={() => setZoomLevel(1)}
+                  aria-label="Zoom back out"
+                  className="min-h-9 rounded-full bg-black/50 px-3 text-sm font-medium tabular-nums backdrop-blur"
+                >
+                  {zoom.toFixed(1)}×
+                </button>
               )}
-            </button>
+              {retake && (
+                <button type="button" onClick={doRetake} className="min-h-9 rounded-full bg-white px-4 text-sm font-medium text-black">
+                  Retake
+                </button>
+              )}
+              {step === "back" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep("front");
+                    setHint("No back. Next one.");
+                  }}
+                  className="min-h-9 rounded-full bg-black/50 px-4 text-sm font-medium backdrop-blur"
+                >
+                  Skip the back
+                </button>
+              )}
+            </div>
+          ) : (
+            latest && (
+              <button
+                type="button"
+                onClick={() => setPanel("review")}
+                className="flex w-full items-center gap-3 rounded-2xl bg-black/60 p-2 pr-3 text-left backdrop-blur"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={latest.thumb} alt="" className="h-12 w-9 shrink-0 rounded object-cover" />
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-sm font-medium">{latest.status === "waiting" || latest.status === "reading" ? "Reading…" : latest.label}</span>
+                  <span className={`truncate text-xs ${["pick", "error", "offline"].includes(latest.status) ? "text-warn" : "text-white/70"}`}>
+                    {latest.status === "saved"
+                      ? latest.merged
+                        ? "Added to one you had"
+                        : latest.problem
+                          ? "Saved · check this"
+                          : "Saved"
+                      : latest.status === "pick"
+                        ? "Tap to pick the right one"
+                        : latest.status === "offline"
+                          ? "Saves when you're back online"
+                          : latest.status === "error"
+                            ? "Couldn't save. Tap for details."
+                            : latest.status === "saving"
+                              ? "Saving…"
+                              : `${counts.saved} saved`}
+                  </span>
+                </span>
+                {latest.status === "saved" && (
+                  <span className="shrink-0 text-right">
+                    <span className="block font-mono text-base font-medium tabular-nums">{latest.price ? money(latest.price) : "No price yet"}</span>
+                  </span>
+                )}
+              </button>
+            )
           )}
         </div>
         <div ref={shutterRow} className="grid grid-cols-3 items-center">
@@ -1070,13 +1155,12 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
             onClick={() => {
               const next = sides === "both" ? "front" : "both";
               chooseSides(next);
-              if (stepRef.current !== "back") setHint(next === "both" ? "Front and back of each item" : "Front only");
+              if (stepRef.current !== "back") setHint(next === "both" ? "2 photos: front and back" : "1 photo: front only");
             }}
-            aria-label={sides === "both" ? "Taking the front and back. Tap for front only." : "Taking the front only. Tap for front and back."}
-            className="flex h-11 items-center gap-1.5 justify-self-end rounded-full bg-black/50 px-3 text-xs font-bold backdrop-blur"
+            aria-label={sides === "both" ? "2 photos: front and back. Tap for 1 photo." : "1 photo: front only. Tap for 2 photos."}
+            className={`${round} justify-self-end`}
           >
             <SidesIcon both={sides === "both"} />
-            {sides === "both" ? "Front + back" : "Front only"}
           </button>
         </div>
       </div>
@@ -1239,16 +1323,44 @@ function ShapeIcon({ shape }: { shape: Shape }) {
   );
 }
 
-/** Front only: one side. Front and back: two arrows going around (turn it over). Different from the frame icon. */
+/** 1 photo (front only) or 2 photos (front and back): one card or two, with the number on it. */
 function SidesIcon({ both }: { both: boolean }) {
   return both ? (
-    <svg {...iconProps} width={18} height={18} aria-hidden>
-      <path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.7M20 4v4.7h-4.7M20 12a8 8 0 0 1-13.7 5.6L4 15.3M4 20v-4.7h4.7" />
+    <svg {...iconProps} aria-hidden>
+      <rect x="2.5" y="6" width="10" height="14" rx="1.5" />
+      <path d="M8 4V3.5A1.5 1.5 0 0 1 9.5 2h10A1.5 1.5 0 0 1 21 3.5v13a1.5 1.5 0 0 1-1.5 1.5H17" />
+      <text x="7.5" y="16.5" textAnchor="middle" fontSize="8" fontWeight="700" fill="currentColor" stroke="none">
+        2
+      </text>
     </svg>
   ) : (
-    <svg {...iconProps} width={18} height={18} aria-hidden>
-      <circle cx="12" cy="12" r="8" />
-      <path d="M12 8v8" />
+    <svg {...iconProps} aria-hidden>
+      <rect x="6" y="3" width="12" height="18" rx="1.5" />
+      <text x="12" y="15.5" textAnchor="middle" fontSize="9" fontWeight="700" fill="currentColor" stroke="none">
+        1
+      </text>
+    </svg>
+  );
+}
+
+/** Auto snap: a frame whose corners hug a card (the frame follows the item). Crossed out when off. */
+function OutlineIcon({ off }: { off: boolean }) {
+  return (
+    <svg {...iconProps} aria-hidden>
+      <path d="M3 8V4a1 1 0 0 1 1-1h4M16 3h4a1 1 0 0 1 1 1v4M21 16v4a1 1 0 0 1-1 1h-4M8 21H4a1 1 0 0 1-1-1v-4" />
+      <rect x="8" y="6.5" width="8" height="11" rx="1" strokeDasharray="2 1.6" />
+      {off && <path d="M3 3l18 18" />}
+    </svg>
+  );
+}
+
+/** Auto capture: a shutter with an A (takes the photo on its own). Crossed out when off. */
+function AutoCaptureIcon({ off }: { off: boolean }) {
+  return (
+    <svg {...iconProps} aria-hidden>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9 16l3-8 3 8M10.1 13.4h3.8" strokeWidth={1.8} />
+      {off && <path d="M3 3l18 18" />}
     </svg>
   );
 }
@@ -1263,12 +1375,12 @@ function CameraIcon() {
 }
 
 /** The frame on screen, the same area that's saved (see guideRect and toVideo). Turns green as auto snap gets ready. */
-function Guide({ rect: r, steady }: { rect: Rect; steady: number }) {
+function Guide({ rect: r, steady, found }: { rect: Rect; steady: number; found: boolean }) {
   const on = steady > 0;
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
       <div
-        className={`absolute overflow-hidden rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.25)] transition-[border-color,border-width] duration-150 ${
+        className={`absolute overflow-hidden rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.25)] duration-150 ${found ? "transition-all" : "transition-[border-color,border-width]"} ${
           on ? "border-[3px] border-ok" : "border-2 border-white/90"
         }`}
         style={{ left: r.x, top: r.y, width: r.w, height: r.h }}
@@ -1283,15 +1395,15 @@ function Guide({ rect: r, steady }: { rect: Rect; steady: number }) {
 const TIPS = [
   {
     title: "Hold it still",
-    body: "Put an item inside the frame. The frame turns green and the photo is taken on its own. Tap the round button any time to take it yourself.",
+    body: "Hold an item up to the camera. The frame snaps around it, turns green, and the photo is taken on its own. Tap the round button any time to take it yourself.",
   },
   {
     title: "It figures out what it is",
-    body: "The menu at the top follows what you scan. Sports cards ask for the back; Pokémon, Magic, and Yu-Gi-Oh! don't. The button right of the shutter switches between front only and front and back.",
+    body: "The menu at the top follows what you scan. Sports cards take 2 photos (front and back); Pokémon, Magic, and Yu-Gi-Oh! take 1.",
   },
   {
     title: "Auto, frame, and fixes",
-    body: "Auto (top left) takes photos on its own; turn it off to tap for each one. Top right: the frame shape (card, sideways, slab, or whole item) and the flash. Pinch to zoom. Retake shows for a few seconds after each photo. The gear has your location and everything you've scanned.",
+    body: "Top left: auto snap (the frame follows the item) and auto capture (takes the photo on its own). Top right: the frame shape and the flash. Bottom right: 1 or 2 photos per item. Pinch to zoom. The gear has your location and everything you've scanned.",
   },
 ];
 
