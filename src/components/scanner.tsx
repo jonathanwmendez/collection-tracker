@@ -176,7 +176,7 @@ type Capture = {
 export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: string | null }) {
   const [phase, setPhase] = useState<"starting" | "camera" | "review">("starting");
   const [location, setLocation] = useState("");
-  const [editingLocation, setEditingLocation] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [auto, setAuto] = useState(true);
   const [step, setStep] = useState<"front" | "back">("front");
   const [mode, setMode] = useState<Mode>("auto");
@@ -492,7 +492,7 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
 
   // Auto-snap: when the picture holds still for half a second and differs from the last photo.
   useEffect(() => {
-    if (phase !== "camera" || !auto || editingLocation) return;
+    if (phase !== "camera" || !auto || settingsOpen) return;
     const c = document.createElement("canvas");
     const ctx = c.getContext("2d", { willReadFrequently: true })!;
     let prev: Uint8ClampedArray | null = null;
@@ -547,7 +547,7 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
       }
     }, 150);
     return () => clearInterval(t);
-  }, [phase, auto, editingLocation, capture]);
+  }, [phase, auto, settingsOpen, capture]);
 
   const opening = useRef(false);
   const start = useCallback(async () => {
@@ -615,6 +615,7 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
   }
 
   async function stop() {
+    setSettingsOpen(false);
     if (card.current.front) await finishItem();
     setTorch("unsupported");
     stream.current?.getTracks().forEach((t) => t.stop());
@@ -730,68 +731,52 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
   // ---------- camera ----------
 
   const prompt = step === "back" ? hint || "Now the back" : hint || "Hold an item in the frame";
-  const chip = "min-h-9 shrink-0 rounded-full bg-black/50 px-3 text-xs font-medium backdrop-blur";
-  const big = "min-h-11 min-w-24 rounded-full bg-black/50 px-4 text-sm font-medium backdrop-blur";
-  const segment = (on: boolean) => `min-h-9 flex-1 rounded-full px-3 text-sm font-medium ${on ? "bg-white text-black" : "text-white"}`;
+  const round = "flex h-11 w-11 items-center justify-center rounded-full bg-black/50 backdrop-blur";
+  const toggleAuto = () => {
+    setAuto(!auto);
+    setHint(auto ? "Auto snap off. Tap the button for each photo." : "Auto snap on. Hold each item still.");
+  };
   return (
     <div ref={stage} className="fixed inset-x-0 z-30 overflow-hidden bg-black text-white" style={{ top: frame.top, bottom: frame.bottom }}>
       <video ref={video} playsInline muted autoPlay className="absolute inset-0 h-full w-full object-cover" />
       {view && <Guide rect={guideRect(view)} />}
       {flash && <div className="absolute inset-0 bg-white/70" />}
-      <div ref={topBar} className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-2 text-sm">
-        {editingLocation ? (
-          <form
-            className="flex flex-1 gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              setEditingLocation(false);
-            }}
+      <div ref={topBar} className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-2">
+        <div className="flex flex-1 basis-0">
+          <button type="button" onClick={toggleAuto} aria-pressed={auto} aria-label={auto ? "Auto snap is on" : "Auto snap is off"} className={round}>
+            <AutoSnapIcon off={!auto} />
+          </button>
+        </div>
+        <label className="relative shrink-0">
+          <span className="sr-only">What you&apos;re scanning</span>
+          <select
+            value={mode}
+            onChange={(e) => applyMode(e.target.value as Mode, true)}
+            className="min-h-11 appearance-none rounded-full bg-black/60 pl-4 pr-9 text-base font-bold text-white backdrop-blur"
           >
-            <input
-              autoFocus
-              aria-label="Where these are kept"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="Box 12, Binder 3…"
-              className="min-h-9 flex-1 min-w-0 rounded-full bg-black/50 px-3 text-base text-white placeholder:text-white/50 backdrop-blur"
-            />
-            <button type="submit" className={chip}>
-              Done
+            {MODES.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+          <span aria-hidden className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-xs">
+            ▼
+          </span>
+        </label>
+        <div className="flex flex-1 basis-0 justify-end">
+          {torch !== "unsupported" && (
+            <button
+              type="button"
+              onClick={toggleTorch}
+              aria-pressed={torch === "on"}
+              aria-label={torch === "on" ? "Flash is on" : "Flash is off"}
+              className={`${round} ${torch === "on" ? "!bg-white text-black" : ""}`}
+            >
+              <FlashIcon off={torch !== "on"} />
             </button>
-          </form>
-        ) : (
-          <>
-            <div className="flex min-w-0 flex-1 basis-0">
-              <button type="button" onClick={() => setEditingLocation(true)} className={`${chip} max-w-full truncate`}>
-                {location ? location : "Set location"}
-              </button>
-            </div>
-            <label className="relative shrink-0">
-              <span className="sr-only">What you&apos;re scanning</span>
-              <select
-                value={mode}
-                onChange={(e) => applyMode(e.target.value as Mode, true)}
-                className="min-h-10 appearance-none rounded-full bg-black/60 pl-4 pr-9 text-base font-bold text-white backdrop-blur"
-              >
-                {MODES.map((m) => (
-                  <option key={m.value} value={m.value}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
-              <span aria-hidden className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-xs">
-                ▼
-              </span>
-            </label>
-            <div className="flex flex-1 basis-0 justify-end">
-              {torch !== "unsupported" && (
-                <button type="button" onClick={toggleTorch} aria-pressed={torch === "on"} className={`${chip} ${torch === "on" ? "bg-white text-black" : ""}`}>
-                  Flash {torch === "on" ? "on" : "off"}
-                </button>
-              )}
-            </div>
-          </>
-        )}
+          )}
+        </div>
       </div>
       <p
         className="absolute inset-x-0 px-4 text-center text-lg font-medium [text-shadow:0_1px_4px_rgba(0,0,0,0.8)]"
@@ -804,29 +789,7 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
         ref={bottomBar}
         className="absolute inset-x-0 bottom-0 px-4 pt-6 pb-3 flex flex-col gap-3 bg-gradient-to-t from-black/75 via-black/45 to-transparent"
       >
-        <div role="group" aria-label="Photos of each item" className="mx-auto flex w-full max-w-xs gap-1 rounded-full bg-black/50 p-1 backdrop-blur">
-          <button type="button" aria-pressed={sides === "front"} onClick={() => chooseSides("front")} className={segment(sides === "front")}>
-            Front only
-          </button>
-          <button type="button" aria-pressed={sides === "both"} onClick={() => chooseSides("both")} className={segment(sides === "both")}>
-            Front &amp; back
-          </button>
-        </div>
-        <p className="text-center text-xs tabular-nums text-white/80">
-          {counts.saved} saved
-          {counts.working ? ` · ${counts.working} working` : ""}
-          {counts.attention ? ` · ${counts.attention} to check` : ""}
-        </p>
-        <div className="flex items-center justify-between gap-3">
-          <button type="button" onClick={stop} className={big}>
-            Done
-          </button>
-          <button
-            type="button"
-            onClick={capture}
-            aria-label="Take photo"
-            className="h-16 w-16 rounded-full border-4 border-white bg-white/25 active:bg-white/60"
-          />
+        <div className="flex min-h-9 items-center justify-center">
           {step === "back" ? (
             <button
               type="button"
@@ -834,15 +797,40 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
                 setStep("front");
                 setHint("No back. Next one.");
               }}
-              className={big}
+              className="min-h-9 rounded-full bg-black/50 px-4 text-sm font-medium backdrop-blur"
             >
-              Skip back
+              Skip the back
             </button>
           ) : (
-            <button type="button" onClick={() => setAuto((a) => !a)} aria-pressed={auto} className={big}>
-              Auto snap {auto ? "on" : "off"}
-            </button>
+            <p className="text-center text-xs tabular-nums text-white/80">
+              {counts.saved} saved
+              {counts.working ? ` · ${counts.working} working` : ""}
+              {counts.attention ? ` · ${counts.attention} to check` : ""}
+            </p>
           )}
+        </div>
+        <div className="grid grid-cols-3 items-center">
+          <button type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings" className={`${round} justify-self-start`}>
+            <GearIcon />
+          </button>
+          <button
+            type="button"
+            onClick={capture}
+            aria-label="Take photo"
+            className="h-16 w-16 justify-self-center rounded-full border-4 border-white bg-white/25 active:bg-white/60"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              const next = sides === "both" ? "front" : "both";
+              chooseSides(next);
+              if (stepRef.current !== "back") setHint(next === "both" ? "Front and back of each item" : "Front only");
+            }}
+            aria-label={sides === "both" ? "Taking the front and back. Tap for front only." : "Taking the front only. Tap for front and back."}
+            className={`${round} justify-self-end`}
+          >
+            <SidesIcon both={sides === "both"} />
+          </button>
         </div>
         <div className="flex gap-2 overflow-x-auto">
           {results.slice(0, 12).map((r) => (
@@ -858,7 +846,107 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
           ))}
         </div>
       </div>
+
+      {settingsOpen && (
+        <div className="absolute inset-0 z-10 flex flex-col justify-end bg-black/50" onClick={() => setSettingsOpen(false)}>
+          <div
+            role="dialog"
+            aria-label="Scan settings"
+            onClick={(e) => e.stopPropagation()}
+            className="flex flex-col gap-4 rounded-t-2xl bg-surface p-4 pb-6 text-ink"
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold">Settings</h2>
+              <button type="button" onClick={() => setSettingsOpen(false)} className="min-h-9 rounded-full px-3 text-sm font-medium text-muted">
+                Close
+              </button>
+            </div>
+            <label className="flex flex-col gap-1 text-sm font-medium">
+              Where these are kept
+              <input
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && setSettingsOpen(false)}
+                placeholder="Box 12, Binder 3…"
+                className="min-h-11 rounded-lg border border-line bg-bg px-3 text-base"
+              />
+              <span className="text-xs font-normal text-muted">Saved with every item you scan, so you can find it later.</span>
+            </label>
+            <div className="flex flex-col divide-y divide-line rounded-xl border border-line text-sm">
+              <button type="button" onClick={stop} className="min-h-12 px-4 text-left font-medium">
+                Review this session{results.length ? ` (${results.length})` : ""}
+                {counts.attention ? <span className="text-warn"> · {counts.attention} to check</span> : null}
+              </button>
+              <Link href="/add" className="flex min-h-12 items-center px-4 font-medium text-ink no-underline">
+                Add without a photo
+              </Link>
+              {intakeUrl && (
+                <a href={intakeUrl} target="_blank" rel="noopener" className="flex min-h-12 items-center px-4 font-medium text-ink no-underline">
+                  Send photos to Claude instead
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+// ---------- icons ----------
+
+const iconProps = {
+  width: 22,
+  height: 22,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round",
+  strokeLinejoin: "round",
+} as const;
+
+/** A lightning bolt; crossed out when off. */
+function FlashIcon({ off }: { off: boolean }) {
+  return (
+    <svg {...iconProps} aria-hidden>
+      <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z" fill={off ? "none" : "currentColor"} />
+      {off && <path d="M3 3l18 18" />}
+    </svg>
+  );
+}
+
+/** A viewfinder with an A in it (snaps automatically); crossed out when off. */
+function AutoSnapIcon({ off }: { off: boolean }) {
+  return (
+    <svg {...iconProps} aria-hidden>
+      <path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" />
+      <path d="M9.5 15.5 12 8.5l2.5 7M10.4 13h3.2" strokeWidth={1.8} />
+      {off && <path d="M3 3l18 18" />}
+    </svg>
+  );
+}
+
+function GearIcon() {
+  return (
+    <svg {...iconProps} aria-hidden>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+    </svg>
+  );
+}
+
+/** One card (front only) or a card with a flip arrow (front and back). */
+function SidesIcon({ both }: { both: boolean }) {
+  return both ? (
+    <svg {...iconProps} aria-hidden>
+      <rect x="3" y="4" width="10" height="15" rx="1.5" />
+      <path d="M16 7h1.5A2.5 2.5 0 0 1 20 9.5V17M17.5 15 20 17.5 22.5 15" />
+    </svg>
+  ) : (
+    <svg {...iconProps} aria-hidden>
+      <rect x="7" y="4" width="10" height="16" rx="1.5" />
+    </svg>
   );
 }
 
