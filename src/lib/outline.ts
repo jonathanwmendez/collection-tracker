@@ -64,14 +64,16 @@ export function detectItem(g: Uint8ClampedArray, w: number, h: number): Box | nu
 
   const col = new Uint16Array(w);
   for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) if (m[y * w + x]! > t) col[x]!++;
-  const cols = longestRun(w, (x) => col[x]! > h * 0.05, Math.max(2, Math.round(w * 0.04)));
+  // A column or row counts as part of the item with only a few edge pixels: blank stretches inside a card
+  // (a text box, a border) still have the card's own edges at either end.
+  const cols = longestRun(w, (x) => col[x]! > Math.max(2, h * 0.025), Math.max(2, Math.round(w * 0.04)));
   if (!cols) return null;
   const [x0, x1] = cols;
 
   const row = new Uint16Array(h);
   for (let y = 1; y < h - 1; y++) for (let x = x0; x <= x1; x++) if (m[y * w + x]! > t) row[y]!++;
   const span = x1 - x0 + 1;
-  const rows = longestRun(h, (y) => row[y]! > span * 0.05, Math.max(2, Math.round(h * 0.04)));
+  const rows = longestRun(h, (y) => row[y]! >= Math.max(2, span * 0.025), Math.max(2, Math.round(h * 0.04)));
   if (!rows) return null;
   const [y0, y1] = rows;
 

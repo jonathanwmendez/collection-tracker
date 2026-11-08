@@ -34,6 +34,16 @@ test("outlines a card on a plain surface", () => {
   assert.ok(Math.abs(box.w - card.w) <= 5 && Math.abs(box.h - card.h) <= 5, `size ${box.w}x${box.h}`);
 });
 
+test("keeps the whole card when it has a large blank area", () => {
+  const card = { x: 25, y: 30, w: 70, h: 140 };
+  const g = picture(card);
+  // Blank out a band in the middle of the card, leaving only its side borders.
+  for (let y = card.y + 50; y < card.y + 110; y++) for (let x = card.x + 3; x < card.x + card.w - 3; x++) g[y * W + x] = 225;
+  const box = detectItem(g, W, H);
+  assert.ok(box);
+  assert.ok(Math.abs(box.y - card.y) <= 3 && Math.abs(box.y + box.h - (card.y + card.h)) <= 4, `rows ${box.y}..${box.y + box.h}`);
+});
+
 test("finds a card that isn't centered", () => {
   const card = { x: 10, y: 80, w: 60, h: 90 };
   const box = detectItem(picture(card), W, H);

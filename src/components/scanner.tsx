@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api-client";
 import { categoryByName } from "@/lib/categories";
+import { subtitle } from "@/lib/collection";
+import { demoItemFor, demoMatch, sampleCamera } from "@/lib/demo-scan";
 import type { Candidate } from "@/lib/identify";
 import { pendingScans, putScan, removeScan, type QueuedScan } from "@/lib/scan-queue";
 import { detectKind, type CardKind, type OcrLine } from "@/lib/card-text";
@@ -202,7 +204,7 @@ type Result = {
   quantity?: number;
 };
 
-const money = (v: number) => `$${v.toFixed(2)}`;
+const money = (v: number) => v.toLocaleString("en-US", { style: "currency", currency: "USD" });
 
 type Capture = {
   front?: Blob;
@@ -213,9 +215,30 @@ type Capture = {
   detected?: CardKind | null;
   /** What the selector said when the front was taken. */
   mode?: Mode;
+  demoName?: string;
 };
 
-export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: string | null }) {
+/**
+ * The Scan page. demo: the public demo's version, which saves nothing. It shows sample cards through a
+ * pretend camera unless the visitor switches to their own camera, and matches scans to the demo's items.
+ */
+export function Scanner({ ebayOn, intakeUrl, demo = false }: { ebayOn: boolean; intakeUrl?: string | null; demo?: boolean }) {
+  // Demo: scans wait in memory instead of on the phone, and the camera can be the sample cards.
+  const memQueue = useRef(new Map<string, QueuedScan>());
+  const queue = useMemo(
+    () =>
+      demo
+        ? {
+            put: async (q: QueuedScan) => void memQueue.current.set(q.id, q),
+            remove: async (id: string) => void memQueue.current.delete(id),
+            pending: async () => [...memQueue.current.values()].sort((a, b) => a.createdAt - b.createdAt),
+          }
+        : { put: putScan, remove: removeScan, pending: pendingScans },
+    [demo],
+  );
+  const [source, setSource] = useState<"sample" | "camera">(demo ? "sample" : "camera");
+  const sample = useRef<ReturnType<typeof sampleCamera> | null>(null);
+  const captures = useRef(0);
   const [phase, setPhase] = useState<"starting" | "camera" | "error">("starting");
   const [location, setLocation] = useState("");
   const [panel, setPanel] = useState<"settings" | "review" | null>(null);
@@ -305,6 +328,25 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
   const processOne = useCallback(
     async (q: QueuedScan, chosen?: Candidate): Promise<boolean> => {
       update(q.id, { status: "reading" });
+      if (demo) {
+        // Nothing is saved in the demo: show which demo item it matched, with its price.
+        const item = q.demoName ? demoItemFor(q.demoName) : demoMatch(q.frontText ?? (await readText(await shrink(q.front, OCR_PX, 0.9)).catch(() => [])));
+        update(
+          q.id,
+          item
+            ? {
+                status: "saved",
+                label: [item.name, subtitle(item)].filter(Boolean).join(" · "),
+                itemId: item.id,
+                price: item.market_value,
+                category: item.category,
+                detail: "Demo: matched to a sample item. Nothing is saved.",
+              }
+            : { status: "saved", label: "Not in the demo's sample items", detail: "In the app, this is saved to your sheet and identified for you." },
+        );
+        await queue.remove(q.id);
+        return true;
+      }
       const old = OLD_KIND[q.kind];
       const oldItem = q.kind.startsWith("item:") ? q.kind.slice(5) : "";
       let candidate = chosen;
@@ -412,7 +454,7 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
           quantity: r.data.quantity,
           detail: r.data.merged ? `Already had it. Quantity is now ${r.data.quantity}.` : candidate.problem ? `Check this: ${candidate.problem}.` : "",
         });
-        await removeScan(q.id);
+        await queue.remove(q.id);
         return true;
       } catch (e) {
         const err = e as {
@@ -427,14 +469,14 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
         return false;
       }
     },
-    [update],
+    [update, demo, queue],
   );
 
   const runQueue = useCallback(async () => {
     if (processing.current) return;
     processing.current = true;
     try {
-      for (const q of await pendingScans()) {
+      for (const q of await queue.pending()) {
         if (deleted.current.has(q.id)) continue;
         const existing = await new Promise<Result | undefined>((res) => setResults((rs) => (res(rs.find((r) => r.id === q.id)), rs)));
         if (existing?.status === "pick" || existing?.status === "saved") continue;
@@ -456,7 +498,7 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
     } finally {
       processing.current = false;
     }
-  }, [processOne]);
+  }, [processOne, queue]);
 
   useEffect(() => {
     void runQueue();
@@ -488,8 +530,9 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
       coa: c.coa,
       frontText: isCardScan ? c.frontText : undefined,
       detected: c.detected ?? picked,
+      demoName: c.demoName,
     };
-    await putScan(q);
+    await queue.put(q);
     setResults((rs) => [
       {
         id: q.id,
@@ -501,7 +544,7 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
       ...rs,
     ]);
     void runQueue();
-  }, [runQueue]);
+  }, [runQueue, queue]);
 
   // Switches what's being scanned (and the frame shape to match, unless you picked one).
   const applyMode = useCallback((m: Mode, byHand: boolean) => {
@@ -563,6 +606,7 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
     const dz = zoomCaps.current ? 1 : zoomRef.current;
     const area = outlineRef.current && itemBoxRef.current ? padBox(itemBoxRef.current, vw) : guideRect(vw, shapeRef.current);
     const blob = await frameToBlob(v, toVideo(area, v, vw, dz), SAVE_PX);
+    captures.current++;
     setFlash(true);
     setTimeout(() => setFlash(false), 120);
     navigator.vibrate?.(30);
@@ -573,6 +617,7 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
         front: blob,
         frontFull: await frameToBlob(v, toVideo({ x: 0, y: 0, w: vw.sw, h: vw.sh }, v, vw, dz), SAVE_PX),
         mode: modeRef.current,
+        demoName: sample.current?.showing() ?? undefined,
       };
       if (sidesRef.current === "both") {
         setStep("back");
@@ -739,16 +784,25 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
   }, [phase, auto, outline, settingsOpen, tips, capture]);
 
   const opening = useRef(false);
+  const sourceRef = useRef(source);
+  sourceRef.current = source;
   const start = useCallback(async () => {
     // Opening twice at once (React runs effects twice in development) would leave a dead stream.
     if (opening.current || stream.current) return;
     opening.current = true;
     setCamError("");
     try {
-      const s = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" }, width: { ideal: 2560 }, height: { ideal: 1440 } },
-        audio: false,
-      });
+      let s: MediaStream;
+      if (sourceRef.current === "sample") {
+        // Demo: sample cards set down on a desk, turned over when the scanner wants the back.
+        sample.current = sampleCamera({ wantBack: () => stepRef.current === "back", captures: () => captures.current });
+        s = sample.current.stream;
+      } else {
+        s = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" }, width: { ideal: 2560 }, height: { ideal: 1440 } },
+          audio: false,
+        });
+      }
       stream.current = s;
       setPhase("camera");
       setStep("front");
@@ -834,6 +888,21 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
     setHint(`Frame: ${SHAPE_LABEL[next].toLowerCase()}`);
   }
 
+  // Demo: switch between the sample cards and your own camera.
+  function switchSource(next: "sample" | "camera") {
+    if (next === source) return;
+    if (card.current.front) void finishItem();
+    stream.current?.getTracks().forEach((t) => t.stop());
+    stream.current = null;
+    sample.current?.stop();
+    sample.current = null;
+    sourceRef.current = next;
+    setSource(next);
+    setPanel(null);
+    setPhase("starting");
+    void start();
+  }
+
   function closeTips() {
     setTips(null);
     try {
@@ -858,6 +927,8 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
       if (card.current.front) void finishRef.current();
       stream.current?.getTracks().forEach((t) => t.stop());
       stream.current = null;
+      sample.current?.stop();
+      sample.current = null;
     },
     [],
   );
@@ -868,7 +939,8 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
       // Height of an element that's showing (0 when hidden with display: none, as the menu is on large screens).
       const height = (sel: string) => document.querySelector(sel)?.getBoundingClientRect().height ?? 0;
       const wide = window.matchMedia("(min-width: 768px)").matches;
-      setFrame({ top: wide ? height("[data-app-header]") : 0, bottom: height("[data-bottom-nav]") });
+      // The demo keeps its header (its menu is there) on phones too.
+      setFrame({ top: wide || demo ? height("[data-app-header]") : 0, bottom: height("[data-bottom-nav]") });
       const el = stage.current;
       if (!el) return;
       // The frame is centered on the screen, clear of the top buttons and the shutter row. The prompt, Retake,
@@ -888,10 +960,10 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
       ro.disconnect();
       window.removeEventListener("resize", place);
     };
-  }, [phase]);
+  }, [phase, demo]);
 
   async function pick(r: Result, c: Candidate | null) {
-    const q = (await pendingScans()).find((x) => x.id === r.id);
+    const q = (await queue.pending()).find((x) => x.id === r.id);
     if (!q) return;
     const chosen: Candidate = c ?? {
       ...r.candidates![0]!,
@@ -907,9 +979,9 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
   // Deletes a scan you don't want. Not saved yet: dropped from this phone. Saved: removed from the sheet,
   // or, when it was added to an item you already had, the quantity goes back down by one.
   async function removeResult(r: Result) {
-    if (r.status !== "saved") {
+    if (demo || r.status !== "saved") {
       deleted.current.add(r.id);
-      await removeScan(r.id);
+      await queue.remove(r.id);
       setResults((rs) => rs.filter((x) => x.id !== r.id));
       return;
     }
@@ -924,6 +996,7 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
 
   async function changeCondition(r: Result, value: string) {
     if (!r.itemId) return;
+    if (demo) return update(r.id, { detail: `Condition set to ${value} (demo, not saved).` });
     const res = await api(`/api/items/${r.itemId}`, {
       method: "PATCH",
       json: { condition: value },
@@ -1206,27 +1279,58 @@ export function Scanner({ ebayOn, intakeUrl }: { ebayOn: boolean; intakeUrl?: st
                 {counts.attention ? <span className="text-warn"> · {counts.attention} to check</span> : null}
               </h3>
               {results.length ? (
-                <ResultList results={results} onPick={pick} onCondition={changeCondition} onDelete={removeResult} onView={setViewing} />
+                <ResultList
+                  results={results}
+                  onPick={pick}
+                  onCondition={changeCondition}
+                  onDelete={removeResult}
+                  onView={setViewing}
+                  itemBase={demo ? "/demo/items" : "/items"}
+                />
               ) : (
                 <p className="rounded-2xl border border-line bg-surface px-4 py-6 text-center text-muted">Nothing scanned yet.</p>
               )}
-              {!ebayOn && (
+              {!ebayOn && !demo && (
                 <p className="text-sm text-muted">
                   Sports cards are saved without a price until eBay is connected. Claude&apos;s nightly run prices the ones it needs to.
                 </p>
               )}
             </section>
 
-            <div className="flex flex-col divide-y divide-line rounded-2xl border border-line bg-surface">
-              <Link href="/add" className="flex min-h-14 items-center px-4 text-base font-medium text-ink no-underline">
-                Add without a photo
-              </Link>
-              {intakeUrl && (
-                <a href={intakeUrl} target="_blank" rel="noopener" className="flex min-h-14 items-center px-4 text-base font-medium text-ink no-underline">
-                  Send photos to Claude instead
-                </a>
-              )}
-            </div>
+            {demo ? (
+              <section className="flex flex-col gap-2" aria-label="Camera">
+                <h3 className="text-sm font-medium text-muted">Camera</h3>
+                <div className="flex flex-col divide-y divide-line rounded-2xl border border-line bg-surface">
+                  {(["sample", "camera"] as const).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => switchSource(v)}
+                      aria-pressed={source === v}
+                      className="flex min-h-14 items-center justify-between gap-3 px-4 text-left text-base font-medium"
+                    >
+                      {v === "sample" ? "Sample cards" : "My camera"}
+                      {source === v && <span className="text-sm text-ok">In use</span>}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-sm text-muted">
+                  This is the demo: nothing is saved or sent anywhere. Sample cards show how scanning works; with your camera, it reads what you hold up and
+                  matches it to the demo&apos;s sample items when it can.
+                </p>
+              </section>
+            ) : (
+              <div className="flex flex-col divide-y divide-line rounded-2xl border border-line bg-surface">
+                <Link href="/add" className="flex min-h-14 items-center px-4 text-base font-medium text-ink no-underline">
+                  Add without a photo
+                </Link>
+                {intakeUrl && (
+                  <a href={intakeUrl} target="_blank" rel="noopener" className="flex min-h-14 items-center px-4 text-base font-medium text-ink no-underline">
+                    Send photos to Claude instead
+                  </a>
+                )}
+              </div>
+            )}
           </div>
           {/* Where your thumb is after tapping the gear. */}
           <div className="border-t border-line bg-surface px-4 py-3">
@@ -1419,17 +1523,19 @@ function ResultList({
   onCondition,
   onDelete,
   onView,
+  itemBase,
 }: {
   results: Result[];
   onPick: (r: Result, c: Candidate | null) => void;
   onCondition: (r: Result, value: string) => void;
   onDelete: (r: Result) => Promise<void>;
   onView: (url: string) => void;
+  itemBase: string;
 }) {
   return (
     <ul className="flex flex-col gap-3">
       {results.map((r) => (
-        <ResultRow key={r.id} r={r} onPick={onPick} onCondition={onCondition} onDelete={onDelete} onView={onView} />
+        <ResultRow key={r.id} r={r} onPick={onPick} onCondition={onCondition} onDelete={onDelete} onView={onView} itemBase={itemBase} />
       ))}
     </ul>
   );
@@ -1441,12 +1547,14 @@ function ResultRow({
   onCondition,
   onDelete,
   onView,
+  itemBase,
 }: {
   r: Result;
   onPick: (r: Result, c: Candidate | null) => void;
   onCondition: (r: Result, value: string) => void;
   onDelete: (r: Result) => Promise<void>;
   onView: (url: string) => void;
+  itemBase: string;
 }) {
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -1510,7 +1618,7 @@ function ResultRow({
         {r.status === "saved" && r.itemId && (
           <>
             <Link
-              href={`/items/${r.itemId}`}
+              href={`${itemBase}/${r.itemId}`}
               className="inline-flex min-h-11 items-center rounded-xl border border-line px-4 text-sm font-medium text-ink no-underline"
             >
               Open

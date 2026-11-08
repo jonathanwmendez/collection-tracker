@@ -10,9 +10,9 @@ const tab = "min-h-9 inline-flex items-center rounded-full px-3 text-sm font-med
 export default function DemoLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-dvh flex flex-col">
-      <header className="print:hidden sticky top-0 z-20 bg-bg/90 backdrop-blur border-b border-line pt-[env(safe-area-inset-top)]">
+      <header data-app-header className="print:hidden sticky top-0 z-20 bg-bg/90 backdrop-blur border-b border-line pt-[env(safe-area-inset-top)]">
         <div className="mx-auto max-w-3xl flex items-center justify-between gap-3 h-14 px-[max(16px,env(safe-area-inset-left))]">
-          <Link href="/demo" className="font-bold tracking-tight text-ink no-underline">
+          <Link href="/demo" className="font-bold tracking-tight text-ink no-underline truncate">
             Collection Tracker
           </Link>
           <nav aria-label="Demo" className="flex gap-1">
@@ -21,6 +21,9 @@ export default function DemoLayout({ children }: { children: React.ReactNode }) 
             </Link>
             <Link href="/demo/value" className={`${tab} text-ink`}>
               Value
+            </Link>
+            <Link href="/demo/scan" className={`${tab} text-ink`}>
+              Scan
             </Link>
           </nav>
         </div>

@@ -2,7 +2,7 @@
 
 A phone-first web app for cataloging and valuing collectibles: sports cards, Magic: The Gathering, Yu-Gi-Oh!, Pokémon, figures, magazines, newspapers, ornaments, and more.
 
-**[Try the demo](https://jonathanwmendez-collection-tracker.vercel.app/demo)** (sample data, no sign-in).
+**[Try the demo](https://jonathanwmendez-collection-tracker.vercel.app/demo)** (sample data, no sign-in). Its **[Scan page](https://jonathanwmendez-collection-tracker.vercel.app/demo/scan)** runs the real scanner on sample cards, no camera needed, or on your own camera from the gear.
 
 <p>
   <img src="docs/collection.png" alt="Collection overview with categories and totals" width="260">
@@ -144,7 +144,7 @@ For local sign-in, also add `http://localhost:3000` to the Google client's JavaS
 | `src/lib/sync.ts` | Sheet-to-database sync, price history, daily value snapshots (also run every morning by `src/app/api/cron/sync`) |
 | `src/lib/collection.ts`, `src/lib/movers.ts` | Totals, gains, grading math, and biggest price changes |
 | `src/components/value-dashboard.tsx` | The Value page, shared with the demo |
-| `src/lib/demo-data.ts`, `src/app/demo/` | The public demo with sample data |
+| `src/lib/demo-data.ts`, `src/lib/demo-scan.ts`, `src/app/demo/` | The public demo with sample data, and the sample cards its Scan page shows |
 | `src/lib/csv.ts` | CSV export |
 | `src/lib/item-sheet.ts` | Safe row writes that check the row first |
 | `src/lib/prices.ts`, `src/lib/ebay.ts` | Free card price lookups and eBay asking prices |

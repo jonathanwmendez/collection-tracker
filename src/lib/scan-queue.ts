@@ -19,6 +19,8 @@ export type QueuedScan = {
   frontText?: OcrLine[];
   /** The kind of card, when the front made it clear while scanning. */
   detected?: CardKind | null;
+  /** Demo only: the sample card this scan was taken of. */
+  demoName?: string;
 };
 
 const DB = "collection-tracker-scans";
