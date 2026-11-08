@@ -8,6 +8,7 @@ export function ValueBadge({ status, stale }: { status: Item["value_status"]; st
     estimate: "bg-clay-soft text-clay-ink",
     verified: "bg-ok-soft text-ok",
     unverifiable: "bg-navy-soft text-muted",
+    asking: "bg-warn-soft text-warn",
   }[status];
   return <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${tone}`}>{VALUE_LABEL[status]}</span>;
 }

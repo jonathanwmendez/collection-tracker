@@ -43,6 +43,9 @@ export async function POST(request: Request) {
   const status: Status = STATUSES.includes(body.status as Status) ? (body.status as Status) : "Keep";
   const typed = String(body.notes ?? "").trim().slice(0, 4000);
   const paid = optionalMoney(body.paid, null);
+  const location = String(body.location ?? "").trim().slice(0, 120);
+  const authenticator = String(body.authenticator ?? "").trim().slice(0, 120);
+  const certNumber = String(body.certNumber ?? "").trim().slice(0, 60);
   // Same tag Collection Intake uses, so the scheduled price check treats the value as unverified.
   const notes = (estimate !== null ? `[Estimate $${estimate}, not verified yet] ` : "[No estimate yet] ") + typed;
 
@@ -60,7 +63,7 @@ export async function POST(request: Request) {
     const { headers } = await readRow(token, settings.sheet_id, category.name, 1);
     if (headers.size === 0) return jsonError(`Your sheet has no "${category.name}" tab.`, 400);
     const row = await nextEmptyRow(token, settings.sheet_id, category.name);
-    const cells = itemCells(category, headers, { name, details, condition, quantity, marketValue: estimate, status, notes: notes.trim(), paid });
+    const cells = itemCells(category, headers, { name, details, condition, quantity, marketValue: estimate, status, notes: notes.trim(), paid, location, authenticator, certNumber });
     await writeCells(token, settings.sheet_id, category.name, row, cells);
 
     await syncCollection(supabase, user.id);

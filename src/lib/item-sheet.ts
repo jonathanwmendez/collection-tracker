@@ -22,7 +22,7 @@ export type ItemRecord = {
   condition: string | null;
   quantity: number;
   market_value: string | number | null;
-  value_status: "estimate" | "verified" | "unverifiable";
+  value_status: "estimate" | "verified" | "unverifiable" | "asking";
   last_checked: string | null;
   status: string;
   notes: string;

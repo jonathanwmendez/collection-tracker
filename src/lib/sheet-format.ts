@@ -20,9 +20,16 @@ export const COL = {
   soldDate: "Sold Date",
   psa9: "PSA 9 (Each)",
   psa10: "PSA 10 (Each)",
+  location: "Location",
+  catalogId: "Catalog ID",
+  authenticator: "Authenticator",
+  certNumber: "Cert Number",
+  coaPhoto: "COA Photo",
 } as const;
 
-export type ValueStatus = "estimate" | "verified" | "unverifiable";
+export type ValueStatus = "estimate" | "verified" | "unverifiable" | "asking";
+/** Where the current price came from, read from the latest price sentence in Notes. */
+export type PriceSource = "claude" | "free" | "asking" | "hand" | "none";
 
 export type SheetItem = {
   row: number;
@@ -48,6 +55,12 @@ export type SheetItem = {
   /** Graded prices for one ungraded card, found by the price check. */
   psa9: number | null;
   psa10: number | null;
+  /** Where it's kept (box, binder), its ID in a card database, and its certificate of authenticity. */
+  location: string;
+  catalogId: string;
+  authenticator: string;
+  certNumber: string;
+  coaPhotoIds: string[];
 };
 
 /** Header name (lowercased) to column index. */
@@ -139,25 +152,55 @@ export function driveFileIds(v: unknown): string[] {
   return [...ids];
 }
 
-/** The order photos show in: the Photo column first, then the Back Photo column. Cards label each side. */
-export function photoSides(front: string[], back: string[], cards: boolean): Array<{ fileId: string; side: "front" | "back" | null }> {
-  const out: Array<{ fileId: string; side: "front" | "back" | null }> = [];
+/** The order photos show in: the Photo column, then Back Photo (cards), then COA Photo. Cards label each side. */
+export function photoSides(
+  front: string[],
+  back: string[],
+  cards: boolean,
+  coa: string[] = [],
+): Array<{ fileId: string; side: "front" | "back" | "coa" | null }> {
+  const out: Array<{ fileId: string; side: "front" | "back" | "coa" | null }> = [];
   const seen = new Set<string>();
-  for (const fileId of front) if (!seen.has(fileId)) { seen.add(fileId); out.push({ fileId, side: cards ? "front" : null }); }
-  for (const fileId of back) if (!seen.has(fileId)) { seen.add(fileId); out.push({ fileId, side: cards ? "back" : null }); }
+  const add = (ids: string[], side: "front" | "back" | "coa" | null) => {
+    for (const fileId of ids) if (!seen.has(fileId)) { seen.add(fileId); out.push({ fileId, side }); }
+  };
+  add(front, cards ? "front" : null);
+  add(back, cards ? "back" : null);
+  add(coa, "coa");
   return out;
 }
 
-/**
- * Whether the value has been checked against real sales. The scheduled price check sets Last Checked and
- * appends "Verified $X ..." or "... no reliable sold data ..." to Notes.
- */
+// The price sentences written to Notes, newest last. Claude's checks write "Verified $X on DATE: ..." or
+// "Price check DATE: no reliable sold data ...". The app writes "Free price $X on DATE: ..." (card databases)
+// and "Asking $X on DATE: ..." (current eBay listings). Edits in the app write "Set by hand to $X on DATE".
+const PRICE_MARKS: Array<[string, PriceSource, ValueStatus]> = [
+  ["verified $", "claude", "verified"],
+  ["no reliable sold data", "claude", "unverifiable"],
+  ["free price $", "free", "verified"],
+  ["asking $", "asking", "asking"],
+  ["set by hand", "hand", "verified"],
+];
+
+function latestMark(notes: string): [string, PriceSource, ValueStatus, number] | null {
+  const lower = notes.toLowerCase();
+  let best: [string, PriceSource, ValueStatus, number] | null = null;
+  for (const [mark, source, status] of PRICE_MARKS) {
+    const at = lower.lastIndexOf(mark);
+    if (at >= 0 && (!best || at > best[3])) best = [mark, source, status, at];
+  }
+  return best;
+}
+
+/** Whether the value has been checked, and how: against sales, a card database, or only current listings. */
 export function valueStatusOf(lastChecked: string | null, notes: string): ValueStatus {
   if (!lastChecked) return "estimate";
-  const lower = notes.toLowerCase();
-  const noData = lower.lastIndexOf("no reliable sold data");
-  const verified = Math.max(lower.lastIndexOf("verified $"), lower.lastIndexOf("set by hand"));
-  return noData > verified ? "unverifiable" : "verified";
+  return latestMark(notes)?.[2] ?? "verified";
+}
+
+/** Where the current price came from. */
+export function priceSource(notes: string, lastChecked: string | null): PriceSource {
+  if (!lastChecked) return "none";
+  return latestMark(notes)?.[1] ?? "claude";
 }
 
 /** Turns one sheet row into an item. Returns null for blank rows. */
@@ -190,6 +233,11 @@ export function parseRow(categoryName: string, headers: Headers, cells: unknown[
     notes,
     photoIds: driveFileIds(get(COL.photo)),
     backPhotoIds: driveFileIds(get(COL.backPhoto)),
+    location: cellText(get(COL.location)),
+    catalogId: cellText(get(COL.catalogId)),
+    authenticator: cellText(get(COL.authenticator)),
+    certNumber: cellText(get(COL.certNumber)),
+    coaPhotoIds: driveFileIds(get(COL.coaPhoto)),
     valueStatus: valueStatusOf(lastChecked, notes),
     paid: parseMoney(get(COL.paid)),
     soldPrice: parseMoney(get(COL.soldPrice)),
@@ -242,6 +290,14 @@ export function itemCells(
     paid?: number | null;
     soldPrice?: number | null;
     soldOn?: string | null;
+    location?: string;
+    catalogId?: string;
+    authenticator?: string;
+    certNumber?: string;
+    /** Drive links, written as HYPERLINK formulas. */
+    photoUrl?: string;
+    backPhotoUrl?: string;
+    coaPhotoUrl?: string;
   },
 ): CellWrite[] {
   const out: CellWrite[] = [];
@@ -262,6 +318,18 @@ export function itemCells(
   put(COL.paid, item.paid);
   put(COL.soldPrice, item.soldPrice);
   put(COL.soldDate, item.soldOn);
+  put(COL.location, item.location);
+  put(COL.catalogId, item.catalogId);
+  put(COL.authenticator, item.authenticator);
+  put(COL.certNumber, item.certNumber);
+  const link = (header: string, url: string | undefined, label: string) => {
+    if (!url) return;
+    const col = colIndex(headers, header);
+    if (col !== undefined) out.push({ col, value: `=HYPERLINK("${url.replace(/"/g, "")}","${label}")` });
+  };
+  link(COL.photo, item.photoUrl, "Photo");
+  link(COL.backPhoto, item.backPhotoUrl, "Back");
+  link(COL.coaPhoto, item.coaPhotoUrl, "COA");
   return out;
 }
 
@@ -281,11 +349,12 @@ export function cellRange(tab: string, col: number, row: number): string {
 /** A one-line description of where an item's current value came from, taken from its notes. */
 export function priceSummary(notes: string, status: ValueStatus): string {
   if (status === "estimate") return "Not checked against sales yet.";
+  const m = latestMark(notes);
+  if (!m) return status === "unverifiable" ? "Checked, but no reliable sold data was found." : "Checked against recent sales.";
   const lower = notes.toLowerCase();
-  const marks = ["verified $", "price check ", "set by hand"];
-  let at = -1;
-  for (const m of marks) at = Math.max(at, lower.lastIndexOf(m));
-  if (at < 0) return status === "unverifiable" ? "Checked, but no reliable sold data was found." : "Checked against recent sales.";
+  // Start the sentence at its beginning ("Price check DATE: no reliable sold data" starts before the mark).
+  let at = m[3];
+  if (m[0] === "no reliable sold data") at = Math.max(lower.lastIndexOf("price check ", at), 0);
   const rest = notes.slice(at);
   const end = rest.search(/\.(\s|$)/);
   return (end >= 0 ? rest.slice(0, end + 1) : rest).trim().slice(0, 300);
@@ -297,7 +366,7 @@ export function priceSummary(notes: string, status: ValueStatus): string {
  */
 export function stripPriceNotes(notes: string): string {
   return notes
-    .replace(/\s*(?:Verified \$|Set by hand to \$)[\d,]*(?:\.\d+)? on \d{4}-\d{2}-\d{2}.*?\.(?=\s|$)/g, "")
+    .replace(/\s*(?:Verified \$|Set by hand to \$|Free price \$|Asking \$)[\d,]*(?:\.\d+)? on \d{4}-\d{2}-\d{2}.*?\.(?=\s|$)/g, "")
     .replace(/\s*Price check \d{4}-\d{2}-\d{2}: no reliable sold data.*?\.(?=\s|$)/gi, "")
     .trim();
 }

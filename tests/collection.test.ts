@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { checkNote, gradingMath, isStale, labeledPhotos, marketLink, matchesQuery, realizedGain, sortItems, staleCutoff, subtitle, summarize, unrealizedGain, type Item } from "../src/lib/collection";
+import { certLookup, checkNote, gradingMath, isStale, labeledPhotos, marketLink, matchesQuery, realizedGain, sortItems, staleCutoff, subtitle, summarize, unrealizedGain, type Item } from "../src/lib/collection";
 
 const base: Item = {
   id: "1",
@@ -22,6 +22,10 @@ const base: Item = {
   sold_on: null,
   psa9: null,
   psa10: null,
+  location: null,
+  catalog_id: null,
+  authenticator: null,
+  cert_number: null,
 };
 
 test("subtitle, search, links", () => {
@@ -104,4 +108,11 @@ test("finds what Claude asked you to check in Notes", () => {
   assert.equal(checkNote({ notes: "Read from the front and back. Check this: edition not visible. Verified $12 on 2026-11-08: TCGplayer market price (TCGplayer)." }), "edition not visible");
   assert.equal(checkNote({ notes: "Check this: could be the 1st Edition printing" }), "could be the 1st Edition printing");
   assert.equal(checkNote({ notes: "Verified $12 on 2026-11-08: median of 6 sold (eBay)." }), null);
+});
+
+test("links a certificate to its lookup", () => {
+  assert.equal(certLookup("PSA/DNA", "AB123")!.url, "https://www.psacard.com/cert/AB123");
+  assert.equal(certLookup("Beckett (BAS)", "0001")!.url, "https://www.beckett-authentication.com/get-data/0001");
+  assert.match(certLookup("JSA", "Z99")!.url, /google\.com\/search\?q=JSA%20Z99/);
+  assert.equal(certLookup(null, null), null);
 });

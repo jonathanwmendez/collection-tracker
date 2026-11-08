@@ -58,6 +58,12 @@ export async function POST(request: Request) {
       if (cost !== null && (!Number.isFinite(cost) || cost < 0 || cost > 100000)) return jsonError("Enter a grading cost in dollars.", 400);
       update.grading_cost = cost;
     }
+    if (body.claudeThreshold !== undefined) {
+      const raw = String(body.claudeThreshold).trim();
+      const t = raw === "" ? 10 : Math.round(Number(raw) * 100) / 100;
+      if (!Number.isFinite(t) || t < 0 || t > 1000000) return jsonError("Enter a dollar amount for Claude price checks.", 400);
+      update.claude_threshold = t;
+    }
 
     // Keep the sheet's Summary settings (read by the nightly price check) the same as the app's.
     let sheetNote: string | undefined;
@@ -65,6 +71,7 @@ export async function POST(request: Request) {
     if (update.reprice_after_days !== undefined) shared.repriceAfterDays = update.reprice_after_days as number;
     if (update.alert_change_pct !== undefined) shared.alertChangePct = update.alert_change_pct as number;
     if (update.grading_cost !== undefined) shared.gradingCost = update.grading_cost as number | null;
+    if (update.claude_threshold !== undefined) shared.claudeThreshold = update.claude_threshold as number;
     if (Object.keys(shared).length) {
       const sheetId =
         (update.sheet_id as string | undefined) ??

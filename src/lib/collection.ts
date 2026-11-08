@@ -2,7 +2,7 @@
 
 import { categoryByName } from "./categories";
 
-export type Photo = { id: string; position: number; drive_url: string | null; side?: "front" | "back" | null };
+export type Photo = { id: string; position: number; drive_url: string | null; side?: "front" | "back" | "coa" | null };
 
 export type Item = {
   id: string;
@@ -12,7 +12,7 @@ export type Item = {
   condition: string | null;
   quantity: number;
   market_value: number | null;
-  value_status: "estimate" | "verified" | "unverifiable";
+  value_status: "estimate" | "verified" | "unverifiable" | "asking";
   last_checked: string | null;
   status: "Keep" | "Sell" | "Listed" | "Sold";
   notes: string;
@@ -25,6 +25,11 @@ export type Item = {
   sold_on: string | null;
   psa9: number | null;
   psa10: number | null;
+  /** Where it's kept, its card database ID, and its certificate of authenticity. */
+  location: string | null;
+  catalog_id: string | null;
+  authenticator: string | null;
+  cert_number: string | null;
 };
 
 /**
@@ -32,16 +37,32 @@ export type Item = {
  * side with no photo yet as missing. Other items have no labels.
  */
 export function labeledPhotos(item: Pick<Item, "category" | "photos">): { photos: Array<Photo & { label?: string }>; missing: string[] } {
-  if (!categoryByName(item.category)?.backPhoto) return { photos: item.photos, missing: [] };
-  const fronts = item.photos.filter((p) => p.side !== "back");
-  const backs = item.photos.filter((p) => p.side === "back");
+  const coa = item.photos.filter((p) => p.side === "coa").map((p, n, all) => ({ ...p, label: all.length > 1 ? `Certificate ${n + 1}` : "Certificate" }));
+  const rest = item.photos.filter((p) => p.side !== "coa");
+  if (!categoryByName(item.category)?.backPhoto) return { photos: [...rest, ...coa], missing: [] };
+  const fronts = rest.filter((p) => p.side !== "back");
+  const backs = rest.filter((p) => p.side === "back");
   const name = (side: string, n: number, of: number) => (of > 1 ? `${side} ${n + 1}` : side);
   const photos = [
     ...fronts.map((p, n) => ({ ...p, label: name("Front", n, fronts.length) })),
     ...backs.map((p, n) => ({ ...p, label: name("Back", n, backs.length) })),
+    ...coa,
   ];
   const missing = [...(fronts.length ? [] : ["Front"]), ...(backs.length ? [] : ["Back"])];
-  return { photos, missing: photos.length ? missing : [] };
+  return { photos, missing: rest.length ? missing : [] };
+}
+
+/** Where to check a certificate number online: the authenticator's own lookup when known, otherwise a web search. */
+export function certLookup(authenticator: string | null, cert: string | null): { label: string; url: string } | null {
+  const a = (authenticator ?? "").trim();
+  const n = (cert ?? "").trim();
+  if (!a && !n) return null;
+  const lower = a.toLowerCase();
+  if (n && /\bpsa\b/.test(lower)) return { label: "Check on PSA", url: `https://www.psacard.com/cert/${encodeURIComponent(n)}` };
+  if (n && /beckett|\bbas\b|\bbgs\b/.test(lower)) return { label: "Check on Beckett", url: `https://www.beckett-authentication.com/get-data/${encodeURIComponent(n)}` };
+  if (/\bmlb\b/.test(lower)) return { label: "Check on MLB.com", url: "https://www.mlb.com/official-information/authentication" };
+  const q = [a, n, "certificate verify"].filter(Boolean).join(" ");
+  return { label: "Look it up", url: `https://www.google.com/search?q=${encodeURIComponent(q)}` };
 }
 
 /** What Claude asked you to check when it added the item from photos ("Check this: ..." in Notes), or null. */
@@ -71,6 +92,10 @@ export function toItem(raw: Record<string, unknown>): Item {
     sold_price: num(raw.sold_price),
     sold_on: (raw.sold_on as string | null | undefined) ?? null,
     psa9: num(raw.psa9),
+    location: (raw.location as string | null | undefined) ?? null,
+    catalog_id: (raw.catalog_id as string | null | undefined) ?? null,
+    authenticator: (raw.authenticator as string | null | undefined) ?? null,
+    cert_number: (raw.cert_number as string | null | undefined) ?? null,
     psa10: num(raw.psa10),
   };
 }
@@ -135,7 +160,7 @@ export function subtitle(i: Pick<Item, "category" | "details">): string {
 export function matchesQuery(i: Item, q: string): boolean {
   const words = q.toLowerCase().split(/\s+/).filter(Boolean);
   if (words.length === 0) return true;
-  const hay = [i.name, i.category, i.condition ?? "", i.status, i.notes, ...Object.values(i.details)].join(" ").toLowerCase();
+  const hay = [i.name, i.category, i.condition ?? "", i.status, i.notes, i.location ?? "", i.authenticator ?? "", i.cert_number ?? "", ...Object.values(i.details)].join(" ").toLowerCase();
   return words.every((w) => hay.includes(w));
 }
 
@@ -241,4 +266,5 @@ export const VALUE_LABEL: Record<Item["value_status"], string> = {
   estimate: "Estimate",
   verified: "Verified",
   unverifiable: "No sales data",
+  asking: "Asking price",
 };

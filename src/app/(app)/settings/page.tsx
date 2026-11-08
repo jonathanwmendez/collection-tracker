@@ -36,6 +36,7 @@ export default async function SettingsPage() {
           repriceDays={settings.reprice_after_days}
           alertPct={settings.alert_change_pct}
           gradingCost={settings.grading_cost}
+          claudeThreshold={settings.claude_threshold}
         />
       </section>
 

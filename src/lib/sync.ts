@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CATEGORIES, categoryByName } from "./categories";
 import { driveModifiedTime, getGoogleAccessToken } from "./google";
-import { parseRow, photoSides, priceSummary, todayISO, type SheetItem } from "./sheet-format";
+import { parseRow, photoSides, priceSource, priceSummary, todayISO, type SheetItem } from "./sheet-format";
 import { getTabs, readSummarySettings, readTabs, type SummaryValues } from "./sheets";
 
 export class SyncError extends Error {
@@ -33,8 +33,11 @@ type ExistingPhoto = {
   drive_file_id: string | null;
   preview_path: string | null;
   position: number;
-  side: "front" | "back" | null;
+  side: "front" | "back" | "coa" | null;
 };
+
+// How a price was found, for the item's price history.
+const METHOD_BY_SOURCE = { claude: "sheet", free: "tcgplayer", asking: "ebay_asking", hand: "manual", none: "sheet" } as const;
 
 const CHUNK = 500;
 const chunks = <T,>(list: T[]) => Array.from({ length: Math.ceil(list.length / CHUNK) }, (_, i) => list.slice(i * CHUNK, (i + 1) * CHUNK));
@@ -47,7 +50,7 @@ const chunks = <T,>(list: T[]) => Array.from({ length: Math.ceil(list.length / C
 export async function syncCollection(supabase: SupabaseClient, userId: string, opts: { force?: boolean } = {}): Promise<SyncResult> {
   const { data: settings } = await supabase
     .from("settings")
-    .select("sheet_id, reprice_after_days, alert_change_pct, grading_cost, sheet_modified_at, last_synced_at")
+    .select("sheet_id, reprice_after_days, alert_change_pct, grading_cost, claude_threshold, sheet_modified_at, last_synced_at")
     .eq("user_id", userId)
     .maybeSingle();
   const sheetId = settings?.sheet_id as string | undefined;
@@ -132,6 +135,10 @@ export async function syncCollection(supabase: SupabaseClient, userId: string, o
       sold_on: s.soldOn,
       psa9: s.psa9,
       psa10: s.psa10,
+      location: s.location || null,
+      catalog_id: s.catalogId || null,
+      authenticator: s.authenticator || null,
+      cert_number: s.certNumber || null,
     };
   });
   // Only write rows that changed since the last sync.
@@ -163,7 +170,7 @@ export async function syncCollection(supabase: SupabaseClient, userId: string, o
     const id = idOf.get(s)!;
     const have = photosByItem.get(id) ?? [];
     const cards = Boolean(categoryByName(s.category)?.backPhoto);
-    const wanted = photoSides(s.photoIds, s.backPhotoIds, cards);
+    const wanted = photoSides(s.photoIds, s.backPhotoIds, cards, s.coaPhotoIds);
     wanted.forEach(({ fileId, side }, position) => {
       const found = have.find((p) => p.drive_file_id === fileId);
       if (!found) {
@@ -215,7 +222,7 @@ export async function syncCollection(supabase: SupabaseClient, userId: string, o
       item_id: idOf.get(s)!,
       user_id: userId,
       value: s.marketValue,
-      method: s.lastChecked ? "sheet" : "claude_estimate",
+      method: s.lastChecked ? METHOD_BY_SOURCE[priceSource(s.notes, s.lastChecked)] : "claude_estimate",
       checked_at: s.lastChecked && !matched.get(s) ? `${s.lastChecked}T17:00:00Z` : now,
       summary: priceSummary(s.notes, s.valueStatus),
     }));
@@ -266,6 +273,8 @@ function summaryUpdates(summary: SummaryValues, current: Record<string, unknown>
   if (summary.gradingCost && (cost ?? null) !== (current.grading_cost === null || current.grading_cost === undefined ? null : Number(current.grading_cost))) {
     out.grading_cost = cost ?? null;
   }
+  const threshold = summary.claudeThreshold?.value;
+  if (threshold !== undefined && threshold !== null && threshold !== Number(current.claude_threshold ?? 10)) out.claude_threshold = threshold;
   return out;
 }
 

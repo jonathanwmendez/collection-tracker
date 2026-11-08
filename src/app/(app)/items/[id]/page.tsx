@@ -3,9 +3,10 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getItem, getSettings } from "@/lib/data";
 import { categoryByName } from "@/lib/categories";
-import { checkNote, gradingMath, isStale, itemTotal, labeledPhotos, marketLink, realizedGain, sheetLink, unrealizedGain } from "@/lib/collection";
+import { certLookup, checkNote, gradingMath, isStale, itemTotal, labeledPhotos, marketLink, realizedGain, sheetLink, unrealizedGain } from "@/lib/collection";
 import { money, shortDate, signedMoney } from "@/lib/format";
 import { canCheckPrice } from "@/lib/prices";
+import { priceSource } from "@/lib/sheet-format";
 import { ItemActions } from "@/components/item-actions";
 import { PhotoGallery } from "@/components/photo-gallery";
 import { Sparkline } from "@/components/sparkline";
@@ -17,6 +18,15 @@ const METHOD: Record<string, string> = {
   web_search: "Price check",
   tcgplayer: "Card database",
   manual: "Set by hand",
+  ebay_asking: "eBay asking price",
+};
+
+const SOURCE_LABEL: Record<string, string> = {
+  claude: "Sold-price check",
+  free: "Card database price",
+  asking: "eBay asking price",
+  hand: "Set by hand",
+  none: "",
 };
 
 export default async function ItemPage({ params }: { params: Promise<{ id: string }> }) {
@@ -39,7 +49,10 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
     ["Condition", item.condition ?? ""],
     ["Qty", String(item.quantity)],
     ["Status", item.status],
+    ["Location", item.location ?? ""],
   ];
+  const source = SOURCE_LABEL[priceSource(item.notes, item.last_checked)];
+  const cert = certLookup(item.authenticator, item.cert_number);
 
   return (
     <article className="flex flex-col gap-6">
@@ -88,12 +101,17 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
             <span className="text-3xl font-medium font-mono tabular-nums">{money(item.market_value)}</span>
             <span className="text-sm text-muted">
               {item.quantity > 1 && item.market_value !== null ? `each, ${money(itemTotal(item))} for ${item.quantity}. ` : ""}
-              {item.last_checked ? `Checked ${shortDate(item.last_checked)}` : "Not checked against sales yet"}
+              {item.last_checked ? `${source ? `${source}, ` : "Checked "}${shortDate(item.last_checked)}` : "Not checked against sales yet"}
               {stale ? ", due for another check" : ""}
             </span>
           </div>
           <Sparkline values={chart} />
         </div>
+        {item.value_status === "asking" && (
+          <p className="text-sm rounded-lg bg-warn-soft text-warn px-3 py-2">
+            This is a typical asking price from current eBay listings, not a sale price. Asking prices usually run higher than what cards sell for.
+          </p>
+        )}
         {item.value_status === "estimate" && (
           <p className="text-sm rounded-lg bg-clay-soft text-clay-ink px-3 py-2">
             This value isn&apos;t checked against real sales yet. Claude prices it in the nightly run at 3:30 AM.
@@ -171,6 +189,23 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
           </section>
         );
       })()}
+
+      {(item.authenticator || item.cert_number) && (
+        <section aria-labelledby="cert" className="rounded-2xl border border-line bg-surface p-4 flex flex-col gap-2 text-sm">
+          <h2 id="cert" className="text-xs font-medium uppercase tracking-wider text-muted">
+            Certificate of authenticity
+          </h2>
+          <p className="flex justify-between gap-3">
+            <span>{item.authenticator || "Authenticator not set"}</span>
+            <span className="font-mono">{item.cert_number || "No number"}</span>
+          </p>
+          {cert && (
+            <a href={cert.url} target="_blank" rel="noopener noreferrer" className="self-start">
+              {cert.label}
+            </a>
+          )}
+        </section>
+      )}
 
       <ItemActions id={item.id} name={item.name} category={item.category} canPrice={canCheckPrice(item.category)} />
 

@@ -10,6 +10,7 @@ import {
   parseMoney,
   parseRow,
   photoSides,
+  priceSource,
   priceSummary,
   readHeaders,
   safeCell,
@@ -167,4 +168,29 @@ test("orders photos front first, then back, and labels sides only for cards", ()
     { fileId: "b1", side: "back" },
   ]);
   assert.deepEqual(photoSides(["a1"], [], false), [{ fileId: "a1", side: null }]);
+});
+
+test("reads where a price came from and labels asking prices", () => {
+  const d = "2026-11-08";
+  assert.equal(priceSource(`Note. Free price $4.50 on ${d}: TCGplayer market (Scryfall).`, d), "free");
+  assert.equal(valueStatusOf(d, `Free price $4.50 on ${d}: TCGplayer market (Scryfall).`), "verified");
+  assert.equal(priceSource(`Asking $3 on ${d}: median of 12 eBay listings.`, d), "asking");
+  assert.equal(valueStatusOf(d, `Asking $3 on ${d}: median of 12 eBay listings.`), "asking");
+  // A later Claude check wins over an earlier free price.
+  const both = `Asking $3 on ${d}: median of 12 eBay listings. Verified $11 on ${d}: median of 6 sold (eBay sold).`;
+  assert.equal(priceSource(both, d), "claude");
+  assert.equal(valueStatusOf(d, both), "verified");
+  assert.equal(priceSource("anything", null), "none");
+  assert.equal(stripPriceNotes(both), "");
+});
+
+test("reads location, catalog ID, and certificate columns", () => {
+  const headers = readHeaders(["Name", "Line / Brand", "Year", "Condition", "Qty", "Market Value (Each)", "Total Value (Auto)", "Last Checked", "eBay Sold (Auto)", "Status", "Photo", "Notes", "Paid (Each)", "Sold For (Each)", "Sold Date", "Location", "Catalog ID", "Authenticator", "Cert Number", "COA Photo"]);
+  const row = ["Signed ball", "Rawlings", "1998", "Loose", 1, "", "", "", "", "Keep", "", "", "", "", "", "Box 3", "", "PSA/DNA", "AB12345", '=HYPERLINK("https://drive.google.com/file/d/COAcoaCOAcoaCOAcoa001/view","COA")'];
+  const item = parseRow("Figures", headers, row, 4)!;
+  assert.equal(item.location, "Box 3");
+  assert.equal(item.authenticator, "PSA/DNA");
+  assert.equal(item.certNumber, "AB12345");
+  assert.deepEqual(item.coaPhotoIds, ["COAcoaCOAcoaCOAcoa001"]);
+  assert.deepEqual(photoSides([], [], false, item.coaPhotoIds), [{ fileId: "COAcoaCOAcoaCOAcoa001", side: "coa" }]);
 });

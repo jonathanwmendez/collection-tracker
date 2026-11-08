@@ -13,12 +13,13 @@ export type Settings = {
   reprice_after_days: number;
   alert_change_pct: number | null;
   grading_cost: number;
+  claude_threshold: number;
 };
 
 export async function getSettings(supabase: SupabaseClient): Promise<Settings> {
   const { data } = await supabase
     .from("settings")
-    .select("sheet_id, intake_url, sheet_tabs, last_synced_at, reprice_after_days, alert_change_pct, grading_cost")
+    .select("sheet_id, intake_url, sheet_tabs, last_synced_at, reprice_after_days, alert_change_pct, grading_cost, claude_threshold")
     .maybeSingle();
   return {
     sheet_id: data?.sheet_id ?? null,
@@ -28,11 +29,12 @@ export async function getSettings(supabase: SupabaseClient): Promise<Settings> {
     reprice_after_days: data?.reprice_after_days ?? 30,
     alert_change_pct: data?.alert_change_pct ?? null,
     grading_cost: data?.grading_cost === null || data?.grading_cost === undefined ? 30 : Number(data.grading_cost),
+    claude_threshold: data?.claude_threshold === null || data?.claude_threshold === undefined ? 10 : Number(data.claude_threshold),
   };
 }
 
 const ITEM_COLUMNS =
-  "id, category, name, details, condition, quantity, market_value, value_status, last_checked, status, notes, sheet_row, updated_at, paid, sold_price, sold_on, psa9, psa10, photos(id, position, drive_url, side)";
+  "id, category, name, details, condition, quantity, market_value, value_status, last_checked, status, notes, sheet_row, updated_at, paid, sold_price, sold_on, psa9, psa10, location, catalog_id, authenticator, cert_number, photos(id, position, drive_url, side)";
 
 export async function getItems(supabase: SupabaseClient, category?: string): Promise<Item[]> {
   let q = supabase.from("items").select(ITEM_COLUMNS).order("sheet_row", { ascending: true });

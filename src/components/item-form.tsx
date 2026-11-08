@@ -17,6 +17,9 @@ export type FormValues = {
   paid: string;
   soldPrice: string;
   soldOn: string;
+  location: string;
+  authenticator: string;
+  certNumber: string;
 };
 
 type Duplicate = { id: string; row: number | null; quantity: number };
@@ -78,6 +81,9 @@ export function ItemForm({ mode, itemId, initial }: { mode: "edit" | "add"; item
               paid: v.paid,
               soldPrice: v.soldPrice,
               soldOn: v.soldOn,
+              location: v.location,
+              authenticator: v.authenticator,
+              certNumber: v.certNumber,
             },
           })
         : await api<{ id: string | null }>("/api/items", {
@@ -91,6 +97,9 @@ export function ItemForm({ mode, itemId, initial }: { mode: "edit" | "add"; item
               status: v.status,
               notes: v.notes,
               paid: v.paid,
+              location: v.location,
+              authenticator: v.authenticator,
+              certNumber: v.certNumber,
               allowDuplicate,
             },
           });
@@ -218,6 +227,23 @@ export function ItemForm({ mode, itemId, initial }: { mode: "edit" | "add"; item
             </label>
           </>
         )}
+        <label className={labelCls}>
+          Location (box, binder)
+          <input className={input} value={v.location} placeholder="Box 12" onChange={(e) => set({ location: e.target.value })} />
+        </label>
+        <label className={labelCls}>
+          Certificate: authenticator
+          <input className={input} value={v.authenticator} list="authenticators" placeholder="PSA/DNA, JSA, Beckett…" onChange={(e) => set({ authenticator: e.target.value })} />
+          <datalist id="authenticators">
+            {["PSA/DNA", "JSA", "Beckett (BAS)", "Fanatics", "Upper Deck Authenticated", "MLB Authentication", "Steiner", "Tristar", "SGC", "CGC"].map((a) => (
+              <option key={a} value={a} />
+            ))}
+          </datalist>
+        </label>
+        <label className={labelCls}>
+          Certificate number
+          <input className={`${input} font-mono`} value={v.certNumber} onChange={(e) => set({ certNumber: e.target.value })} />
+        </label>
         <label className={`${labelCls} sm:col-span-2`}>
           Notes
           <textarea className={`${input} min-h-24 py-2`} value={v.notes} onChange={(e) => set({ notes: e.target.value })} />

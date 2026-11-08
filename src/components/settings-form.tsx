@@ -14,12 +14,14 @@ export function SettingsForm({
   repriceDays,
   alertPct,
   gradingCost,
+  claudeThreshold,
 }: {
   sheetUrl: string;
   intakeUrl: string;
   repriceDays: number;
   alertPct?: number | null;
   gradingCost?: number;
+  claudeThreshold?: number;
 }) {
   const router = useRouter();
   const { sync } = useSync();
@@ -28,6 +30,7 @@ export function SettingsForm({
   const [days, setDays] = useState(String(repriceDays));
   const [alert, setAlert] = useState(alertPct === null || alertPct === undefined ? "" : String(alertPct));
   const [grading, setGrading] = useState(String(gradingCost ?? 30));
+  const [threshold, setThreshold] = useState(String(claudeThreshold ?? 10));
   const advanced = alertPct !== undefined;
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "bad"; text: string; needsSignIn?: boolean } | null>(null);
@@ -43,7 +46,7 @@ export function SettingsForm({
         ...(sheetChanged ? { sheet } : {}),
         intakeUrl: intake,
         repriceAfterDays: days,
-        ...(advanced ? { alertChangePct: alert, gradingCost: grading } : {}),
+        ...(advanced ? { alertChangePct: alert, gradingCost: grading, claudeThreshold: threshold } : {}),
       },
     });
     setSaving(false);
@@ -87,6 +90,11 @@ export function SettingsForm({
             Grading cost per card ($)
             <input className={`${input} max-w-32`} type="number" min={0} step={1} value={grading} onChange={(e) => setGrading(e.target.value)} inputMode="decimal" />
             <span className="text-xs font-normal text-muted">Used to find cards worth grading. Include shipping if you like.</span>
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-medium">
+            Claude checks sold prices over ($)
+            <input className={`${input} max-w-32`} type="number" min={0} step={1} value={threshold} onChange={(e) => setThreshold(e.target.value)} inputMode="decimal" />
+            <span className="text-xs font-normal text-muted">Cards priced for free at or above this get a real sold-price check in the nightly run. Cheaper cards keep their free price.</span>
           </label>
           <p className="text-xs text-muted">These settings are saved to your sheet&apos;s Summary tab too, so the app, the sheet, and the price check always match.</p>
         </>

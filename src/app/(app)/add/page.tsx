@@ -61,6 +61,9 @@ export default async function AddPage() {
             paid: "",
             soldPrice: "",
             soldOn: "",
+            location: "",
+            authenticator: "",
+            certNumber: "",
           }}
         />
       </details>

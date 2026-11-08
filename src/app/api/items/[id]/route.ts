@@ -41,6 +41,11 @@ export async function PATCH(request: Request, { params }: Params) {
     const paid = optionalMoney(body.paid, toNum(cur.paid));
     const soldPrice = optionalMoney(body.soldPrice, toNum(cur.sold_price));
     let soldOn = body.soldOn === undefined ? cur.sold_on : parseDate(body.soldOn);
+    const cur2 = item as unknown as { location: string | null; authenticator: string | null; cert_number: string | null };
+    const text = (v: unknown, fallback: string | null, max = 120) => (v === undefined ? (fallback ?? "") : String(v ?? "").trim().slice(0, max));
+    const location = text(body.location, cur2.location);
+    const authenticator = text(body.authenticator, cur2.authenticator);
+    const certNumber = text(body.certNumber, cur2.cert_number, 60);
     // Marking an item Sold without a date records today.
     if (status === "Sold" && !soldOn) soldOn = todayISO();
 
@@ -70,6 +75,9 @@ export async function PATCH(request: Request, { params }: Params) {
       paid,
       soldPrice,
       soldOn,
+      location,
+      authenticator,
+      certNumber,
       ...(valueChanged ? { marketValue, lastChecked } : {}),
     });
     await writeCells(ctx.token, ctx.sheetId, category.name, item.sheet_row!, cells);
@@ -89,6 +97,9 @@ export async function PATCH(request: Request, { params }: Params) {
         paid,
         sold_price: soldPrice,
         sold_on: soldOn,
+        location: location || null,
+        authenticator: authenticator || null,
+        cert_number: certNumber || null,
       })
       .eq("id", id);
     if (error) console.error("Update item failed", error);

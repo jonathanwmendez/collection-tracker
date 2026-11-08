@@ -97,6 +97,7 @@ export const SUMMARY_SETTINGS = {
   repriceAfterDays: "Reprice After (Days)",
   alertChangePct: "Alert On Change (%)",
   gradingCost: "Grading Cost (Each)",
+  claudeThreshold: "Claude Check Over ($)",
 } as const;
 export type SummaryKey = keyof typeof SUMMARY_SETTINGS;
 export type SummaryValues = Partial<Record<SummaryKey, { row: number; value: number | null }>>;

@@ -73,6 +73,13 @@ export const CATEGORIES: Category[] = [
     conditions: ["In Box", "No Box", "Damaged Box"],
   },
   {
+    name: "Sets & Sealed",
+    slug: "sets-sealed",
+    fields: ["Product", "Year", "Brand", "Sport / Game", "Type"],
+    conditions: ["Factory Sealed", "Sealed", "Shrink Torn"],
+    suggestions: { Type: ["Factory Set", "Hobby Box", "Retail Box", "Wax Box", "Blaster", "Pack", "Tin / Can", "Other"] },
+  },
+  {
     name: "Other",
     slug: "other",
     fields: ["Item", "Type", "Year"],
