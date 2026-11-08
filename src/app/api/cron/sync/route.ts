@@ -34,7 +34,7 @@ export async function GET(request: Request) {
       continue;
     }
     try {
-      const r = await syncCollection(admin, user_id);
+      const r = await syncCollection(admin, user_id, { force: true });
       results.push({ user: user_id, ok: true, items: r.items });
     } catch (e) {
       // Usually an expired Google sign-in (Testing mode ends access after 7 days). The app asks them to sign in again.

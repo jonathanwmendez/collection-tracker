@@ -1,7 +1,8 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CATEGORIES, categoryByName } from "./categories";
-import { getGoogleAccessToken } from "./google";
+import { driveModifiedTime, getGoogleAccessToken } from "./google";
 import { parseRow, photoSides, priceSummary, todayISO, type SheetItem } from "./sheet-format";
 import { getTabs, readSummarySettings, readTabs, type SummaryValues } from "./sheets";
 
@@ -21,9 +22,11 @@ export type SyncResult = {
   removed: number;
   syncedAt: string;
   missingTabs: string[];
+  /** True when the sheet hadn't changed since the last sync, so nothing was read or written. */
+  unchanged?: boolean;
 };
 
-type Existing = { id: string; category: string; name: string; sheet_row: number | null; market_value: string | number | null; last_checked: string | null };
+type Existing = { id: string; category: string; name: string; sheet_row: number | null; market_value: string | number | null; last_checked: string | null; row_hash: string | null };
 type ExistingPhoto = {
   id: string;
   item_id: string;
@@ -41,16 +44,24 @@ const chunks = <T,>(list: T[]) => Array.from({ length: Math.ceil(list.length / C
  * rows added there (by Collection Intake, the scheduled price check, or by hand) appear in the app,
  * and rows deleted there disappear. Price changes are recorded so the app can chart them.
  */
-export async function syncCollection(supabase: SupabaseClient, userId: string): Promise<SyncResult> {
+export async function syncCollection(supabase: SupabaseClient, userId: string, opts: { force?: boolean } = {}): Promise<SyncResult> {
   const { data: settings } = await supabase
     .from("settings")
-    .select("sheet_id, reprice_after_days, alert_change_pct, grading_cost")
+    .select("sheet_id, reprice_after_days, alert_change_pct, grading_cost, sheet_modified_at, last_synced_at")
     .eq("user_id", userId)
     .maybeSingle();
   const sheetId = settings?.sheet_id as string | undefined;
   if (!sheetId) throw new SyncError("Connect your Google Sheet in Settings first.", 400);
 
   const token = await getGoogleAccessToken(userId);
+
+  // Skip the whole read when the sheet hasn't changed since the last sync (large sheets take a while to read).
+  const modified = await driveModifiedTime(token, sheetId).catch(() => null);
+  const lastModified = settings?.sheet_modified_at ? new Date(settings.sheet_modified_at as string).toISOString() : null;
+  if (!opts.force && modified && lastModified && new Date(modified).toISOString() === lastModified) {
+    const { count } = await supabase.from("items").select("id", { count: "exact", head: true }).eq("user_id", userId);
+    return { items: count ?? 0, added: 0, updated: 0, removed: 0, syncedAt: (settings?.last_synced_at as string) ?? new Date().toISOString(), missingTabs: [], unchanged: true };
+  }
   const { tabs } = await getTabs(token, sheetId);
   const present = CATEGORIES.map((c) => c.name).filter((n) => n in tabs);
   const missingTabs = CATEGORIES.map((c) => c.name).filter((n) => !(n in tabs));
@@ -71,13 +82,15 @@ export async function syncCollection(supabase: SupabaseClient, userId: string): 
 
   const { data: existingRows, error: exErr } = await supabase
     .from("items")
-    .select("id, category, name, sheet_row, market_value, last_checked")
+    .select("id, category, name, sheet_row, market_value, last_checked, row_hash")
     .eq("user_id", userId);
   if (exErr) throw new SyncError("Couldn't read the app's copy of your collection.", 500);
   const existing = (existingRows ?? []) as Existing[];
 
   // Match rows to items: same tab and row with the same name first, then same tab and name (rows that moved).
   const byRow = new Map(existing.map((e) => [`${e.category}#${e.sheet_row}`, e]));
+  const byName = new Map<string, Existing[]>();
+  for (const e of existing) byName.set(`${e.category}#${e.name}`, [...(byName.get(`${e.category}#${e.name}`) ?? []), e]);
   const used = new Set<string>();
   const matched = new Map<SheetItem, Existing>();
   for (const s of sheetItems) {
@@ -89,7 +102,7 @@ export async function syncCollection(supabase: SupabaseClient, userId: string): 
   }
   for (const s of sheetItems) {
     if (matched.has(s)) continue;
-    const e = existing.find((x) => !used.has(x.id) && x.category === s.category && x.name === s.name);
+    const e = (byName.get(`${s.category}#${s.name}`) ?? []).find((x) => !used.has(x.id));
     if (e) {
       matched.set(s, e);
       used.add(e.id);
@@ -121,7 +134,10 @@ export async function syncCollection(supabase: SupabaseClient, userId: string): 
       psa10: s.psa10,
     };
   });
-  for (const part of chunks(upserts)) {
+  // Only write rows that changed since the last sync.
+  const hashById = new Map(existing.map((e) => [e.id, e.row_hash]));
+  const changed = upserts.map((u) => ({ ...u, row_hash: rowHash(u) })).filter((u) => hashById.get(u.id) !== u.row_hash);
+  for (const part of chunks(changed)) {
     const { error } = await supabase.from("items").upsert(part, { onConflict: "id" });
     if (error) {
       console.error("Sync upsert failed", error);
@@ -216,6 +232,7 @@ export async function syncCollection(supabase: SupabaseClient, userId: string): 
     .update({
       last_synced_at: now,
       sheet_tabs: tabs,
+      ...(modified ? { sheet_modified_at: modified } : {}),
       ...summaryUpdates(summary, settings ?? {}),
     })
     .eq("user_id", userId);
@@ -231,7 +248,13 @@ export async function syncCollection(supabase: SupabaseClient, userId: string): 
   };
 }
 
-/** Saves today's total value, for the value-over-time chart. One snapshot per day; later syncs replace it. */
+/** A fingerprint of everything synced for a row, so unchanged rows aren't rewritten. */
+function rowHash(row: Record<string, unknown>): string {
+  const rest = Object.fromEntries(Object.entries(row).filter(([k]) => k !== "id" && k !== "user_id"));
+  return createHash("sha1").update(JSON.stringify(rest)).digest("hex");
+}
+
+/** Settings changed on the sheet's Summary tab. */
 function summaryUpdates(summary: SummaryValues, current: Record<string, unknown>) {
   const out: Record<string, number | null> = {};
   const days = summary.repriceAfterDays?.value;
@@ -246,6 +269,7 @@ function summaryUpdates(summary: SummaryValues, current: Record<string, unknown>
   return out;
 }
 
+/** Saves today's total value, for the value-over-time chart. One snapshot per day; later syncs replace it. */
 async function recordSnapshot(supabase: SupabaseClient, userId: string, all: SheetItem[]) {
   // Sold items are no longer in the collection.
   const items = all.filter((i) => i.status !== "Sold");

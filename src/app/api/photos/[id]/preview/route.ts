@@ -15,5 +15,5 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     .maybeSingle();
   if (!photo) return jsonError("Photo not found.", 404);
   const size = sizeFrom(new URL(request.url).searchParams.get("size"));
-  return previewResponse(auth.supabase, auth.user.id, photo as PhotoRow, "private, max-age=3000", size);
+  return previewResponse(auth.supabase, auth.user.id, photo as PhotoRow, "private, max-age=86400", size);
 }

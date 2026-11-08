@@ -88,3 +88,15 @@ export async function downloadDriveFile(token: string, fileId: string): Promise<
   );
   return res.arrayBuffer();
 }
+
+/** When the file (the sheet) last changed, so a sync can be skipped when nothing did. */
+export async function driveModifiedTime(token: string, fileId: string): Promise<string | null> {
+  const res = await googleFetch(
+    token,
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=modifiedTime&supportsAllDrives=true`,
+    {},
+    "Google Drive",
+  );
+  const body = (await res.json().catch(() => ({}))) as { modifiedTime?: string };
+  return body.modifiedTime ?? null;
+}
