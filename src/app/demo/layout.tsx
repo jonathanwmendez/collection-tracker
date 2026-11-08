@@ -10,7 +10,7 @@ const tab = "min-h-9 inline-flex items-center rounded-full px-3 text-sm font-med
 export default function DemoLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-dvh flex flex-col">
-      <header className="sticky top-0 z-20 bg-bg/90 backdrop-blur border-b border-line pt-[env(safe-area-inset-top)]">
+      <header className="print:hidden sticky top-0 z-20 bg-bg/90 backdrop-blur border-b border-line pt-[env(safe-area-inset-top)]">
         <div className="mx-auto max-w-3xl flex items-center justify-between gap-3 h-14 px-[max(16px,env(safe-area-inset-left))]">
           <Link href="/demo" className="font-bold tracking-tight text-ink no-underline">
             Collection Tracker
@@ -25,7 +25,7 @@ export default function DemoLayout({ children }: { children: React.ReactNode }) 
           </nav>
         </div>
       </header>
-      <div className="bg-navy-soft border-b border-line">
+      <div className="print:hidden bg-navy-soft border-b border-line">
         <p className="mx-auto max-w-3xl px-[max(16px,env(safe-area-inset-left))] py-2 text-sm">
           <span className="font-medium">Demo with sample data.</span> Values and dates are made up.{" "}
           <a href="https://github.com/jonathanwmendez/collection-tracker" target="_blank" rel="noopener noreferrer">

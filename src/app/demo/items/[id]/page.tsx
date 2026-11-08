@@ -1,11 +1,20 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { categoryByName } from "@/lib/categories";
-import { gradingMath, isStale, itemTotal, marketLink, realizedGain, unrealizedGain } from "@/lib/collection";
+import { certLookup, gradingMath, isStale, itemTotal, marketLink, realizedGain, unrealizedGain } from "@/lib/collection";
 import { DEMO } from "@/lib/demo-data";
 import { money, shortDate, signedMoney } from "@/lib/format";
+import { priceSource } from "@/lib/sheet-format";
 import { Sparkline } from "@/components/sparkline";
 import { StatusBadge, ValueBadge } from "@/components/value-badge";
+
+const SOURCE_LABEL: Record<string, string> = {
+  claude: "Sold-price check",
+  free: "Card database price",
+  asking: "eBay asking price",
+  hand: "Set by hand",
+  none: "",
+};
 
 export function generateStaticParams() {
   return DEMO.items.map((i) => ({ id: i.id }));
@@ -25,7 +34,10 @@ export default async function DemoItem({ params }: { params: Promise<{ id: strin
     ["Condition", item.condition ?? ""],
     ["Qty", String(item.quantity)],
     ["Status", item.status],
+    ["Location", item.location ?? ""],
   ];
+  const source = SOURCE_LABEL[priceSource(item.notes, item.last_checked)];
+  const cert = certLookup(item.authenticator, item.cert_number);
 
   return (
     <article className="flex flex-col gap-6">
@@ -47,7 +59,7 @@ export default async function DemoItem({ params }: { params: Promise<{ id: strin
             <span className="text-3xl font-medium font-mono tabular-nums">{money(item.market_value)}</span>
             <span className="text-sm text-muted">
               {item.quantity > 1 && item.market_value !== null ? `each, ${money(itemTotal(item))} for ${item.quantity}. ` : ""}
-              {item.last_checked ? `Checked ${shortDate(item.last_checked)}` : "Not checked against sales yet"}
+              {item.last_checked ? `${source ? `${source}, ` : "Checked "}${shortDate(item.last_checked)}` : "Not checked against sales yet"}
             </span>
           </div>
           <Sparkline values={history.map((h) => h.value!)} />
@@ -96,6 +108,21 @@ export default async function DemoItem({ params }: { params: Promise<{ id: strin
             </p>
           )}
           <p className="text-xs text-muted">Compared with today&apos;s value plus a $30 grading fee.</p>
+        </section>
+      )}
+
+      {(item.authenticator || item.cert_number) && (
+        <section className="rounded-2xl border border-line bg-surface p-4 flex flex-col gap-2 text-sm">
+          <h2 className="text-xs font-medium uppercase tracking-wider text-muted">Certificate of authenticity</h2>
+          <p className="flex justify-between gap-3">
+            <span>{item.authenticator}</span>
+            <span className="font-mono">{item.cert_number}</span>
+          </p>
+          {cert && (
+            <p className="text-xs text-muted">
+              In the app, this links to {cert.label.startsWith("Check on ") ? cert.label.slice(9) : "a search"} to confirm it. The number here is a sample.
+            </p>
+          )}
         </section>
       )}
 

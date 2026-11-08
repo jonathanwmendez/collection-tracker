@@ -16,7 +16,7 @@ A Google Sheet is the main copy of the collection. Four pieces work on it:
 
 | Piece | Runs on | What it does |
 |---|---|---|
-| **Scan page** | This web app, on your phone | Tap Add and the camera opens. Hold up any item: it snaps on its own, reads the text on the phone, and works out what it is (sports card, Magic, Pokémon, Yu-Gi-Oh!, or something else). The selector at the top follows what you scan. It takes 1 photo per item (the front) unless you switch to 2 (front and back), which helps sports cards since they're read from the back. Flash where the phone allows it. It saves to the sheet with a free price, or shows the top 3 matches when unsure. Works offline and catches up when the signal returns. No Claude usage |
+| **Scan page** | This web app, on your phone | Tap Add and the camera opens. Hold up any item: it snaps on its own, reads the text on the phone, and works out what it is (sports card, Magic, Pokémon, Yu-Gi-Oh!, or something else). The selector at the top follows what you scan. It takes 1 photo per item (the front) unless you switch to 2 (front and back), which helps sports cards since they're read from the back. Auto snap outlines the item and auto capture takes the photo when it's still and in focus; retake, delete, and fix matches as you go. It saves to the sheet with a free price, or shows the top 3 matches when unsure. Works offline and catches up when the signal returns. No Claude usage |
 | **Collection Intake** | A Claude artifact | For anything that isn't a card: take photos and you're done. They upload to a Drive inbox. No Claude usage |
 | **Morning pricing** | This web app, daily at 9 AM | Free prices, no Claude: Magic, Pokémon, and Yu-Gi-Oh! from their card databases every day, and sports cards from current eBay listings (labeled "asking") once they're due |
 | **Background task** | A Claude scheduled task, nightly at 3:30 AM | Identifies Intake photos and scans the app couldn't read, prices from recent sold listings (everything that isn't a card, plus cards worth at least the "Claude Check Over" amount, $10 by default), checks certificates, samples the free prices for accuracy on Sundays, adds PSA 9 and PSA 10 prices, emails alerts for big moves, and logs each run to a Price Log tab. Stops starting new items at 8:00 AM |
@@ -113,7 +113,7 @@ Open your Vercel address and sign in with Google. You'll see "Google hasn't veri
 Everyone uses their own Google account and their own Claude plan. Their data stays separate.
 
 1. They open the app and use **Request access** on the login page, or you invite them on the **Admin** page (Settings > Open Admin).
-2. Approve or invite them on the Admin page. Then add their email under **Google Auth Platform > Audience > Test users**. Google doesn't let apps change that list, so the Admin page links to it.
+2. Approve or invite them on the Admin page. If your Google app is still in Testing rather than In production, also add their email under **Google Auth Platform > Audience > Test users**. Google doesn't let apps change that list, so the Admin page links to it.
 3. They sign in, and the setup checklist walks them through the rest, including a button that copies the Claude setup prompt.
 
 The Admin page shows each person's progress (signed in, Google, sheet, Intake, synced) and lets you make admins or remove access. Anyone can delete their own account and app data from Settings.
@@ -149,7 +149,8 @@ For local sign-in, also add `http://localhost:3000` to the Google client's JavaS
 | `src/lib/item-sheet.ts` | Safe row writes that check the row first |
 | `src/lib/prices.ts`, `src/lib/ebay.ts` | Free card price lookups and eBay asking prices |
 | `src/lib/reprice.ts`, `src/lib/reprice-rules.ts` | Morning free repricing and which items it covers |
-| `src/components/scanner.tsx`, `src/lib/card-text.ts`, `src/lib/identify.ts`, `src/lib/scan.ts` | Scan page: camera, reading card text, matching, and saving |
+| `src/components/scanner.tsx`, `src/lib/card-text.ts`, `src/lib/identify.ts`, `src/lib/scan.ts`, `src/lib/outline.ts` | Scan page: camera, outlining the item, reading card text, matching, and saving |
+| `src/components/insurance-report.tsx` | The printable insurance report, shared with the demo |
 | `src/lib/paged.ts` | Reads past Supabase's 1,000-row limit |
 | `src/lib/access.ts` | Owners, invites, and roles |
 | `src/lib/shares.ts`, `src/app/s/` | Share links and the public view-only pages |
@@ -157,7 +158,7 @@ For local sign-in, also add `http://localhost:3000` to the Google client's JavaS
 | `supabase/migrations/` | Tables: items, photos, price_checks, value_snapshots, settings, google_tokens, members, access_requests, shares |
 | `claude/` | Setup prompt, Collection Intake page, and the background task prompt (`price-check.md`) |
 | `vercel.json` | Daily sync schedule, and a redirect from this deployment's old address (safe to remove in a fork) |
-| `tests/` | Unit tests for row parsing, card text, price lookups, repricing rules, access and share rules, collection math, and CSV export |
+| `tests/` | Unit tests for row parsing, card text and card-type detection, item outlining, price lookups, repricing rules, access and share rules, collection math, and CSV export |
 
 ## Security
 

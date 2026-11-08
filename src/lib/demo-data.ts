@@ -3,6 +3,7 @@
 
 import { toItem, type Item } from "./collection";
 import type { Check } from "./movers";
+import { valueStatusOf } from "./sheet-format";
 
 type Seed = {
   category: string;
@@ -18,33 +19,41 @@ type Seed = {
   checked?: number | null; // days ago, null = still an estimate
   noData?: boolean;
   trend?: number; // total change over the history, as a fraction (0.2 = +20%)
+  // Where the price came from: Claude's sold-price check (default), a free card database, or eBay asking prices.
+  source?: "claude" | "free" | "asking";
+  location?: string;
+  cert?: [string, string]; // [authenticator, certificate number]
 };
 
 const SEEDS: Seed[] = [
-  { category: "Pokémon", name: "Charizard", details: { Set: "Base Set", "Card #": "4/102", Rarity: "Holo Rare", Variant: "Holo" }, condition: "LP", value: 365, paid: 120, psa: [1450, 6200], checked: 3, trend: 0.18 },
-  { category: "Pokémon", name: "Blastoise", details: { Set: "Base Set", "Card #": "2/102", Rarity: "Holo Rare", Variant: "Holo" }, condition: "MP", value: 118, paid: 60, checked: 12, trend: 0.06 },
-  { category: "Pokémon", name: "Pikachu", details: { Set: "Base Set", "Card #": "58/102", Rarity: "Common", Variant: "Non-Holo" }, condition: "NM", quantity: 3, value: 2.5, paid: 0.5, checked: 20 },
-  { category: "Pokémon", name: "Umbreon VMAX", details: { Set: "Evolving Skies", "Card #": "215/203", Rarity: "Secret Rare", Variant: "Holo" }, condition: "NM", value: 1180, paid: 640, psa: [1500, 2900], checked: 2, trend: 0.24 },
-  { category: "Magic: The Gathering", name: "Sol Ring", details: { Set: "Commander Masters", "Collector #": "410", Finish: "Non-foil" }, condition: "NM", quantity: 4, value: 1.6, checked: 9 },
-  { category: "Magic: The Gathering", name: "The One Ring", details: { Set: "The Lord of the Rings: Tales of Middle-earth", "Collector #": "246", Finish: "Non-foil" }, condition: "NM", value: 58, paid: 75, checked: 5, trend: -0.22 },
-  { category: "Magic: The Gathering", name: "Ragavan, Nimble Pilferer", details: { Set: "Modern Horizons 2", "Collector #": "138", Finish: "Non-foil" }, condition: "LP", value: 46, paid: 70, checked: 41, trend: -0.15 },
-  { category: "Magic: The Gathering", name: "Rhystic Study", details: { Set: "Prophecy", "Collector #": "45", Finish: "Non-foil" }, condition: "MP", value: 34, paid: 12, checked: 7, trend: 0.1 },
-  { category: "Yu-Gi-Oh!", name: "Blue-Eyes White Dragon", details: { Set: "Legend of Blue Eyes White Dragon", "Set Code": "LOB-001", Rarity: "Ultra Rare", Edition: "Unlimited" }, condition: "LP", value: 88, psa: [260, 900], checked: 6, trend: 0.05 },
-  { category: "Yu-Gi-Oh!", name: "Dark Magician", details: { Set: "Starter Deck: Yugi", "Set Code": "SDY-006", Rarity: "Ultra Rare", Edition: "Unlimited" }, condition: "NM", value: 12, checked: 15 },
-  { category: "Sports Cards", name: "Michael Jordan", details: { Year: "1990", "Brand / Set": "Fleer", "Card #": "26", "Parallel / Variant": "Base", Grade: "" }, condition: "Raw", value: 22, paid: 8, psa: [95, 610], checked: 4, trend: 0.08 },
-  { category: "Sports Cards", name: "Ken Griffey Jr.", details: { Year: "1989", "Brand / Set": "Upper Deck", "Card #": "1", "Parallel / Variant": "Base", Grade: "PSA 8" }, condition: "Graded", value: 135, paid: 90, checked: 11, trend: -0.04 },
-  { category: "Sports Cards", name: "Victor Wembanyama", details: { Year: "2023", "Brand / Set": "Panini Prizm", "Card #": "136", "Parallel / Variant": "Silver", Grade: "" }, condition: "Raw", value: 210, paid: 260, psa: [320, 640], checked: 1, trend: -0.3 },
+  { category: "Pokémon", name: "Charizard", details: { Set: "Base Set", "Card #": "4/102", Rarity: "Holo Rare", Variant: "Holo" }, condition: "LP", value: 365, paid: 120, psa: [1450, 6200], checked: 3, trend: 0.18, location: "Binder 1" },
+  { category: "Pokémon", name: "Blastoise", details: { Set: "Base Set", "Card #": "2/102", Rarity: "Holo Rare", Variant: "Holo" }, condition: "MP", value: 118, paid: 60, checked: 12, trend: 0.06, location: "Binder 1" },
+  { category: "Pokémon", name: "Pikachu", details: { Set: "Base Set", "Card #": "58/102", Rarity: "Common", Variant: "Non-Holo" }, condition: "NM", quantity: 3, value: 2.5, paid: 0.5, checked: 20, location: "Binder 1", source: "free" },
+  { category: "Pokémon", name: "Umbreon VMAX", details: { Set: "Evolving Skies", "Card #": "215/203", Rarity: "Secret Rare", Variant: "Holo" }, condition: "NM", value: 1180, paid: 640, psa: [1500, 2900], checked: 2, trend: 0.24, location: "Binder 1" },
+  { category: "Magic: The Gathering", name: "Sol Ring", details: { Set: "Commander Masters", "Collector #": "410", Finish: "Non-foil" }, condition: "NM", quantity: 4, value: 1.6, checked: 9, location: "Box 2", source: "free" },
+  { category: "Magic: The Gathering", name: "The One Ring", details: { Set: "The Lord of the Rings: Tales of Middle-earth", "Collector #": "246", Finish: "Non-foil" }, condition: "NM", value: 58, paid: 75, checked: 5, trend: -0.22, location: "Box 2" },
+  { category: "Magic: The Gathering", name: "Ragavan, Nimble Pilferer", details: { Set: "Modern Horizons 2", "Collector #": "138", Finish: "Non-foil" }, condition: "LP", value: 46, paid: 70, checked: 41, trend: -0.15, location: "Box 2" },
+  { category: "Magic: The Gathering", name: "Rhystic Study", details: { Set: "Prophecy", "Collector #": "45", Finish: "Non-foil" }, condition: "MP", value: 34, paid: 12, checked: 7, trend: 0.1, location: "Box 2" },
+  { category: "Yu-Gi-Oh!", name: "Blue-Eyes White Dragon", details: { Set: "Legend of Blue Eyes White Dragon", "Set Code": "LOB-001", Rarity: "Ultra Rare", Edition: "Unlimited" }, condition: "LP", value: 88, psa: [260, 900], checked: 6, trend: 0.05, location: "Box 3" },
+  { category: "Yu-Gi-Oh!", name: "Dark Magician", details: { Set: "Starter Deck: Yugi", "Set Code": "SDY-006", Rarity: "Ultra Rare", Edition: "Unlimited" }, condition: "NM", value: 12, checked: 15, location: "Box 3", source: "free" },
+  { category: "Sports Cards", name: "Michael Jordan", details: { Year: "1990", "Brand / Set": "Fleer", "Card #": "26", "Parallel / Variant": "Base", Grade: "" }, condition: "Raw", value: 22, paid: 8, psa: [95, 610], checked: 4, trend: 0.08, location: "Box 4" },
+  { category: "Sports Cards", name: "Ken Griffey Jr.", details: { Year: "1989", "Brand / Set": "Upper Deck", "Card #": "1", "Parallel / Variant": "Base", Grade: "PSA 8" }, condition: "Graded", value: 135, paid: 90, checked: 11, trend: -0.04, location: "Box 4", cert: ["PSA", "00012345"] },
+  { category: "Sports Cards", name: "Victor Wembanyama", details: { Year: "2023", "Brand / Set": "Panini Prizm", "Card #": "136", "Parallel / Variant": "Silver", Grade: "" }, condition: "Raw", value: 210, paid: 260, psa: [320, 640], checked: 1, trend: -0.3, location: "Box 4" },
   { category: "Sports Cards", name: "Derek Jeter", details: { Year: "1993", "Brand / Set": "Upper Deck SP", "Card #": "279", "Parallel / Variant": "Foil", Grade: "" }, condition: "Raw", value: 190, status: "Sold", paid: 85, sold: [240, 18], checked: 25 },
-  { category: "Figures", name: "Michael Jordan Triple Play", details: { "Line / Brand": "Playmates Space Jam", Year: "1996" }, condition: "In Box", value: 22, paid: 5, checked: 1 },
-  { category: "Figures", name: "Boba Fett", details: { "Line / Brand": "Kenner Star Wars", Year: "1979" }, condition: "Loose", value: 74, checked: 33, trend: 0.03 },
-  { category: "Figures", name: "Optimus Prime", details: { "Line / Brand": "Hasbro Transformers G1", Year: "1984" }, condition: "Loose", value: 95, paid: 40, status: "Sell", checked: 8 },
+  { category: "Sports Cards", name: "Cal Ripken Jr.", details: { Year: "1995", "Brand / Set": "Sportflix UC3", "Card #": "37", "Parallel / Variant": "Base", Grade: "" }, condition: "Raw", value: 1.75, checked: 3, source: "asking", location: "Box 4" },
+  { category: "Figures", name: "Michael Jordan Triple Play", details: { "Line / Brand": "Playmates Space Jam", Year: "1996" }, condition: "In Box", value: 22, paid: 5, checked: 1, location: "Shelf" },
+  { category: "Figures", name: "Boba Fett", details: { "Line / Brand": "Kenner Star Wars", Year: "1979" }, condition: "Loose", value: 74, checked: 33, trend: 0.03, location: "Shelf" },
+  { category: "Figures", name: "Optimus Prime", details: { "Line / Brand": "Hasbro Transformers G1", Year: "1984" }, condition: "Loose", value: 95, paid: 40, status: "Sell", checked: 8, location: "Shelf" },
   { category: "Magazines", name: "Sports Illustrated", details: { Issue: "Vol. 80 No. 1", Date: "1994-01-10", "Cover / Feature": "Michael Jordan retires" }, condition: "Good", value: 18, checked: 14 },
   { category: "Magazines", name: "Nintendo Power", details: { Issue: "Issue 1", Date: "1988-07", "Cover / Feature": "Super Mario Bros. 2" }, condition: "Very Good", value: 145, paid: 30, checked: 6, trend: 0.12 },
   { category: "Newspapers", name: "The Philadelphia Inquirer", details: { Date: "2018-02-05", Headline: "Super Bowl champions" }, condition: "Near Mint", value: 25, checked: 40 },
   { category: "Newspapers", name: "The New York Times", details: { Date: "1969-07-21", Headline: "Men walk on moon" }, condition: "Good", value: 60, noData: true, checked: 22 },
   { category: "Ornaments", name: "Millennium Falcon", details: { "Brand / Series": "Hallmark Keepsake", Year: "1996" }, condition: "In Box", value: 42, paid: 24, checked: 10 },
   { category: "Ornaments", name: "Starship Enterprise", details: { "Brand / Series": "Hallmark Keepsake", Year: "1991" }, condition: "No Box", value: 28, checked: null },
-  { category: "Other", name: "Super Mario 64", details: { Type: "Video game (N64, cartridge)", Year: "1996" }, condition: "Used", value: 32, paid: 15, checked: 9 },
+  { category: "Sets & Sealed", name: "Pokémon 151 Booster Bundle", details: { Year: "2023", Brand: "The Pokémon Company", "Sport / Game": "Pokémon", Type: "Other" }, condition: "Factory Sealed", value: 48, paid: 27, checked: 6, trend: 0.15, location: "Closet" },
+  { category: "Sets & Sealed", name: "1990 Fleer Basketball Wax Box", details: { Year: "1990", Brand: "Fleer", "Sport / Game": "Basketball", Type: "Wax Box" }, condition: "Factory Sealed", value: 640, paid: 210, checked: 18, trend: 0.09, location: "Closet" },
+  { category: "Other", name: "Cal Ripken Jr. signed baseball", details: { Type: "Autographed baseball", Year: "2001" }, condition: "Like New", value: 185, paid: 120, checked: 12, location: "Shelf", cert: ["JSA", "AB00123"] },
+  { category: "Other", name: "Super Mario 64", details: { Type: "Video game (N64, cartridge)", Year: "1996" }, condition: "Used", value: 32, paid: 15, checked: 9, location: "Shelf" },
 ];
 
 // Dates are relative to today, so the demo never looks out of date.
@@ -73,7 +82,11 @@ function build() {
         ? `[Estimate $${s.value}, not verified yet]`
         : s.noData
           ? `Price check ${isoDay(checked)}: no reliable sold data, value is an estimate.`
-          : `Verified $${s.value} on ${isoDay(checked)}: median of ${5 + (n % 6)} sold (eBay sold, 130point).`;
+          : s.source === "free"
+            ? `Free price $${s.value} on ${isoDay(checked)}: TCGplayer market price, ${s.details["Set"] ?? ""} ${s.details["Card #"] ?? s.details["Collector #"] ?? s.details["Set Code"] ?? ""}.`
+            : s.source === "asking"
+              ? `Asking $${s.value} on ${isoDay(checked)}: median of 7 current eBay listings (asking prices, not sales).`
+              : `Verified $${s.value} on ${isoDay(checked)}: median of ${5 + (n % 6)} sold (eBay sold, 130point).`;
     items.push(
       toItem({
         id,
@@ -83,8 +96,11 @@ function build() {
         condition: s.condition,
         quantity: s.quantity ?? 1,
         market_value: s.value,
-        value_status: checked === null ? "estimate" : s.noData ? "unverifiable" : "verified",
+        value_status: valueStatusOf(checked === null ? null : isoDay(checked), notes),
         last_checked: checked === null ? null : isoDay(checked),
+        location: s.location ?? null,
+        authenticator: s.cert?.[0] ?? null,
+        cert_number: s.cert?.[1] ?? null,
         status: s.status ?? "Keep",
         notes,
         sheet_row: n + 2,

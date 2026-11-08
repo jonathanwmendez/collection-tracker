@@ -28,11 +28,11 @@ export function AdminPanel({ people, requests, appUrl, me }: { people: Person[];
       text: (
         <span className="flex flex-col gap-2">
           <span>
-            Invited {addr}. Next, add them as a test user in{" "}
+            Invited {addr}. If your Google app is still in Testing, also add them as a test user in{" "}
             <a href={GOOGLE_TEST_USERS} target="_blank" rel="noopener noreferrer">
               Google Auth Platform &gt; Audience
             </a>
-            . Google blocks sign-in until you do.
+            . Google blocks their sign-in until you do.
           </span>
           <button type="button" className={`${smallBtn} self-start`} onClick={() => navigator.clipboard?.writeText(text)}>
             Copy invite message
