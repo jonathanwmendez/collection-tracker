@@ -100,3 +100,42 @@ export async function driveModifiedTime(token: string, fileId: string): Promise<
   const body = (await res.json().catch(() => ({}))) as { modifiedTime?: string };
   return body.modifiedTime ?? null;
 }
+
+const DRIVE = "https://www.googleapis.com/drive/v3/files";
+const FOLDER = "application/vnd.google-apps.folder";
+
+/** Creates a Drive folder the app owns (allowed by the drive.file permission). */
+export async function createDriveFolder(token: string, name: string, parent?: string): Promise<string> {
+  const res = await googleFetch(
+    token,
+    `${DRIVE}?fields=id`,
+    { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, mimeType: FOLDER, ...(parent ? { parents: [parent] } : {}) }) },
+    "Google Drive",
+  );
+  return ((await res.json()) as { id: string }).id;
+}
+
+/** Uploads a JPEG into a folder the app owns. Returns the file ID and a link for the sheet. */
+export async function uploadDrivePhoto(token: string, folderId: string, name: string, bytes: Uint8Array): Promise<{ id: string; url: string }> {
+  const boundary = `ct${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
+  const meta = JSON.stringify({ name, parents: [folderId], mimeType: "image/jpeg" });
+  const head = `--${boundary}\r\ncontent-type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\ncontent-type: image/jpeg\r\n\r\n`;
+  const tail = `\r\n--${boundary}--`;
+  const body = Buffer.concat([Buffer.from(head), Buffer.from(bytes), Buffer.from(tail)]);
+  const res = await googleFetch(
+    token,
+    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id&supportsAllDrives=true",
+    { method: "POST", headers: { "content-type": `multipart/related; boundary=${boundary}` }, body },
+    "Google Drive",
+  );
+  const { id } = (await res.json()) as { id: string };
+  return { id, url: `https://drive.google.com/file/d/${id}/view` };
+}
+
+/** Whether a folder the app saved still exists (someone may have deleted it in Drive). */
+export async function driveFolderExists(token: string, id: string): Promise<boolean> {
+  const res = await fetch(`${DRIVE}/${encodeURIComponent(id)}?fields=id,trashed`, { headers: { authorization: `Bearer ${token}` } });
+  if (!res.ok) return false;
+  const body = (await res.json().catch(() => ({}))) as { trashed?: boolean };
+  return !body.trashed;
+}

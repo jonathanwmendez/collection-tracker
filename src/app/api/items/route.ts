@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { jsonError, requireUser } from "@/lib/api-auth";
 import { errorResponse } from "@/lib/api-errors";
 import { categoryByName, nameField, STATUSES, type Status } from "@/lib/categories";
@@ -7,6 +6,7 @@ import { getGoogleAccessToken } from "@/lib/google";
 import { itemCells, optionalMoney, parseMoney } from "@/lib/sheet-format";
 import { nextEmptyRow, readRow, writeCells } from "@/lib/sheets";
 import { syncCollection } from "@/lib/sync";
+import { findDuplicate } from "@/lib/duplicates";
 
 export const maxDuration = 60;
 
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
 
     // Already have it? Offer to raise the quantity instead of adding a second row.
     if (body.allowDuplicate !== true) {
-      const dup = await findDuplicate(supabase, category.name, name, details, condition);
+      const dup = await findDuplicate(supabase, { category: category.name, name, details, condition });
       if (dup) return NextResponse.json({ duplicate: dup }, { status: 409 });
     }
 
@@ -77,30 +77,4 @@ export async function POST(request: Request) {
   } catch (e) {
     return errorResponse(e, "Couldn't add the item.");
   }
-}
-
-const norm = (v: unknown) => String(v ?? "").trim().toLowerCase();
-
-/** An item you still own with the same name, the same filled-in details, and the same condition. */
-async function findDuplicate(
-  supabase: SupabaseClient,
-  category: string,
-  name: string,
-  details: Record<string, string>,
-  condition: string,
-): Promise<{ id: string; row: number | null; quantity: number } | null> {
-  const { data } = await supabase
-    .from("items")
-    .select("id, name, details, condition, quantity, sheet_row, status")
-    .eq("category", category)
-    .ilike("name", name.replace(/[%_\\]/g, (c) => "\\" + c));
-  for (const r of data ?? []) {
-    if (r.status === "Sold" || norm(r.name) !== norm(name)) continue;
-    const theirs = (r.details ?? {}) as Record<string, string>;
-    const same = Object.entries(details).every(([k, v]) => !norm(v) || !norm(theirs[k]) || norm(v) === norm(theirs[k]));
-    if (!same) continue;
-    if (norm(r.condition) && norm(condition) && norm(r.condition) !== norm(condition)) continue;
-    return { id: r.id as string, row: r.sheet_row as number | null, quantity: r.quantity as number };
-  }
-  return null;
 }

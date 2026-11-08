@@ -14,4 +14,6 @@ export function supabaseConfigured(): boolean {
 export const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/spreadsheets",
   "https://www.googleapis.com/auth/drive.readonly",
+  // Lets the Scan page save photos into folders the app creates. It can't see or change anything else.
+  "https://www.googleapis.com/auth/drive.file",
 ].join(" ");
