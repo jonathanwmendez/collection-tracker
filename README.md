@@ -17,11 +17,11 @@ A Google Sheet is the main copy of the collection. Four pieces work on it:
 | Piece | Runs on | What it does |
 |---|---|---|
 | **Scan page** | This web app, on your phone | Tap Add and the camera opens. Hold up any item: it snaps on its own, reads the text on the phone, and works out what it is (sports card, Magic, Pokémon, Yu-Gi-Oh!, or something else). The selector at the top follows what you scan. It takes 1 photo per item (the front) unless you switch to 2 (front and back), which helps sports cards since they're read from the back. Auto snap outlines the item and auto capture takes the photo when it's still and in focus; retake, delete, and fix matches as you go. It saves to the sheet with a free price, or shows the top 3 matches when unsure. Works offline and catches up when the signal returns. No Claude usage |
-| **Collection Intake** | A Claude artifact | For anything that isn't a card: take photos and you're done. They upload to a Drive inbox. No Claude usage |
+| **Collection Intake** | A Claude artifact | For anything that isn't a card: take photos and you're done. They upload to a Drive inbox, and a minute after the last one (or when you tap Done) the background task starts, so items show up in a few minutes. If it can't start, they wait for the nightly run |
 | **Morning pricing** | This web app, daily at 9 AM | Free prices, no Claude: Magic, Pokémon, and Yu-Gi-Oh! from their card databases every day, and sports cards from current eBay listings (labeled "asking") once they're due |
-| **Background task** | A Claude scheduled task, nightly at 3:30 AM | Identifies Intake photos and scans the app couldn't read, prices from recent sold listings (everything that isn't a card, plus cards worth at least the "Claude Check Over" amount, $10 by default), checks certificates, samples the free prices for accuracy on Sundays, adds PSA 9 and PSA 10 prices, emails alerts for big moves, and logs each run to a Price Log tab. Stops starting new items at 8:00 AM |
+| **Background task** | A Claude scheduled task, nightly at 3:30 AM, plus right after Collection Intake uploads | Identifies Intake photos and scans the app couldn't read, prices from recent sold listings (everything that isn't a card, plus cards worth at least the "Claude Check Over" amount, $10 by default), checks certificates, samples the free prices for accuracy on Sundays, adds PSA 9 and PSA 10 prices, emails alerts for big moves, and logs each run to a Price Log tab. Stops starting new items at 8:00 AM |
 
-The app makes no paid AI calls. Only the background task uses a Claude subscription, and only overnight.
+The app makes no paid AI calls. Only the background task uses a Claude subscription: overnight, plus a short run after each batch of Collection Intake photos.
 
 **App features:**
 - Collection: search, category lists with filters, item pages with full-screen photos (cards show front and back) and price history, and a list of items Claude flagged to check
@@ -46,6 +46,7 @@ About 30 minutes. Do the steps in order: each one uses an address from the one b
 |---|---|---|
 | Google Sheets | Setup, background task | Reading and writing the sheet |
 | Google Drive | Setup, Collection Intake, background task | Photo folders, uploads, and reading photos |
+| Claude Code Remote | Collection Intake | Starts the background task right after you take photos. Built into claude.ai |
 | Gmail | Background task | Price alert emails. Optional: without it, alerts go in the Price Log tab instead |
 | Supabase | Setup | Optional. Runs the database migrations for you (create the Supabase project in step 2.1 first) |
 | Vercel | Setup | Optional. Creates the Vercel project and adds the variables that aren't secret |
