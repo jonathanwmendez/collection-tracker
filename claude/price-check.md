@@ -72,37 +72,30 @@ ACCURACY SAMPLE (nightly run on Sundays only, after CERTIFICATES, while there is
 - If the app's prices are off by more than 25% on average, say so in the summary and suggest a different "Claude Check Over ($)" amount.
 
 NEW TABS
-If the spreadsheet has a category tab that isn't listed above (any tab except 'Summary' and 'Price Log'), read its row 1 to find the "Market Value (Each)", "Last Checked", and "Notes" columns and price it the same way. Before pricing a new kind of item, search for the trusted sold-price sources for it (completed-sales databases, auction archives, the hobby's standard price guide) and use the best ones. List those sources in your final summary under "Suggested sources for <tab>" so they can be added to this list.
+If the spreadsheet has a category tab that isn't listed above (any tab except 'Summary' and 'Price Log'), read its row 1 to find the "Market Value (Each)", "Last Checked", and "Notes" columns and price it the same way. Use the same two sources (eBay sold for everything, plus TCGplayer market price if it's a card game).
 
-SOURCES BY CATEGORY (free; find pages through web search, then open them with web fetch. Some sites are paywalled or block automated reading: skip those and move to the next source.)
-- Every category: eBay sold listings (completed and sold only), and 130point (eBay sold prices including accepted Best Offer amounts, which eBay hides).
-- Sports Cards: 130point and eBay sold first. PSA Auction Prices Realized for PSA-graded cards (match the grade). SportsCardsPro for ungraded and per-grade prices. Heritage Auctions and Goldin results for graded or high-value cards.
-- Magic: The Gathering: TCGplayer market price for the exact printing and finish (Scryfall's card page shows it). eBay sold for graded or high-value cards.
-- Pokémon: TCGplayer market price for the exact printing and variant. PriceCharting for ungraded and graded prices. 130point / eBay sold for graded cards.
-- Yu-Gi-Oh!: TCGplayer market price for the exact set code, rarity, and edition. YGOPRODeck card page. PriceCharting. eBay sold for 1st Edition or graded cards.
-- Other card games (if a tab for one is added): TCGplayer market price; TCGCSV (tcgcsv.com) publishes TCGplayer's price data daily.
-- Figures: eBay sold, Wheeljack's Lab, hobbyDB, Heritage Auctions results.
-- Magazines and Newspapers: eBay sold, WorthPoint (when readable), Heritage Auctions archives.
-- Ornaments: eBay sold, hobbyDB, WorthPoint (when readable).
-- Other: eBay sold, 130point, WorthPoint, Heritage Auctions, hobbyDB, plus any price guide specific to that kind of item.
-- Sets & Sealed: match the exact product, year, and type (hobby box, blaster, retail, case, booster box, elite trainer box, pack) and whether it is factory sealed. Sports: SportsCardsPro sealed product pages (sportscardspro.com, e.g. ".../hobby-box"), eBay sold and 130point, Waxstat when readable. Pokémon, Magic, Yu-Gi-Oh!: TCGplayer market price for the sealed product, PriceCharting sealed product pages (e.g. ".../booster-box"), eBay sold. A box or case with torn shrink or a resealed look sells for less: say so in Notes.
+SOURCES (only these two; find pages through web search, then open them with web fetch)
+- eBay sold listings (completed and sold only), for every item on every tab, including graded cards and sealed products.
+- TCGplayer market price, for Magic: The Gathering, Pokémon, and Yu-Gi-Oh! cards (the exact printing, finish or variant, set code, rarity, and edition; Scryfall's card page shows it for Magic) and their sealed products.
+- Don't use any other price source. If neither can be read for an item, mark it "no reliable sold data" (see WHAT TO WRITE).
+- Sets & Sealed: match the exact product, year, and type (hobby box, blaster, retail, case, booster box, elite trainer box, pack) and whether it is factory sealed. A box or case with torn shrink or a resealed look sells for less: say so in Notes.
 
 HOW TO PRICE
 - Price ONE unit (the "each" value), matching the item's condition, grade, variant/finish/edition, and whether it is boxed or loose.
-- Prefer completed sales over everything else. Asking prices are not sales; only use them as a last resort and say so.
-- Use the median of the most recent comparable sales (ideally 5 or more, across sources when one source has too few). Ignore obvious outliers and lots.
-- A price guide built from sales (TCGplayer market price, PriceCharting, SportsCardsPro) counts as verified. hobbyDB and similar estimates are supporting evidence only, not a verified price on their own.
+- Use completed sales only. Asking prices (active listings) are not sales: never use them.
+- Use the median of the most recent comparable sales (ideally 5 or more). Ignore obvious outliers and lots.
+- For a Magic, Pokémon, or Yu-Gi-Oh! card or sealed product, TCGplayer market price counts as verified. Use it when eBay sold has fewer than 5 comparable sales; when both have enough, use eBay sold.
 - Be efficient: stop searching once you have enough comparable sales.
 
 GRADED PRICES (card tabs only: Sports Cards, Magic: The Gathering, Yu-Gi-Oh!, Pokémon)
-- For an ungraded card (Condition isn't "Graded" and the Grade column, where there is one, is empty) whose new market value is at least the threshold (see WHAT THE APP PRICES), also find what the same card sells for graded PSA 9 and PSA 10. Use PSA Auction Prices Realized, SportsCardsPro, PriceCharting, or 130point, the same way as above (median of recent sales).
+- For an ungraded card (Condition isn't "Graded" and the Grade column, where there is one, is empty) whose new market value is at least the threshold (see WHAT THE APP PRICES), also find what the same card sells for graded PSA 9 and PSA 10. Use eBay sold listings for that card in a PSA 9 or PSA 10 slab, the same way as above (median of recent sales).
 - Write them to the PSA 9 and PSA 10 columns. Leave a cell empty (null) when there isn't reliable data. Don't do this for cards under the threshold or for cards that are already graded.
 
 WHAT TO WRITE
 - Write each row in ONE update_values call covering the Market Value column through the Notes column of that row (through the PSA 10 column on card tabs when you found graded prices), using null for every cell in between that you must not change (null cells are skipped). Example for 'Figures' row 2: range 'Figures'!F2:L2, values [[22.5, null, "2026-11-07", null, null, null, "<notes>"]].
 - Market Value: the number only (e.g. 22.5), no $ sign.
 - Last Checked: today's date as YYYY-MM-DD.
-- Notes: keep any text the owner wrote, and keep "Cert verified" lines. Remove a leading "[Estimate ...]" or "[No estimate yet]" tag if present. Remove any earlier "Verified $...", "Free price $...", "Asking $...", "Set by hand to $...", or "Price check ...: no reliable sold data..." sentence, so Notes holds the owner's text plus only the latest result. Then append: "Verified $X on YYYY-MM-DD: median of N sold ([sources])." or, for a price guide, "Verified $X on YYYY-MM-DD: [guide] [price type] ([source])." If you could not find reliable sales, keep the existing value (write null for Market Value), still set Last Checked so the row isn't retried every run, and append: "Price check YYYY-MM-DD: no reliable sold data, value is an estimate."
+- Notes: keep any text the owner wrote, and keep "Cert verified" lines. Remove a leading "[Estimate ...]" or "[No estimate yet]" tag if present. Remove any earlier "Verified $...", "Free price $...", "Asking $...", "Set by hand to $...", or "Price check ...: no reliable sold data..." sentence, so Notes holds the owner's text plus only the latest result. Then append: "Verified $X on YYYY-MM-DD: median of N sold ([sources])." or, for TCGplayer, "Verified $X on YYYY-MM-DD: TCGplayer market price." If you could not find reliable sales, keep the existing value (write null for Market Value), still set Last Checked so the row isn't retried every run, and append: "Price check YYYY-MM-DD: no reliable sold data, value is an estimate."
 - Always start the appended note with "Verified $" or include "no reliable sold data" exactly as above; the Collection Tracker app reads those phrases.
 - NEVER write to the Total Value or the eBay/TCGplayer link columns, the Status column, the Photo, Back Photo, and COA Photo columns, or the Paid, Sold For, Sold Date, Location, Catalog ID, Authenticator, and Cert Number columns (always null) when pricing. They hold formulas or the owner's data. (NEW PHOTOS and NEEDS IDENTIFYING fill Status, the photo columns, and the certificate columns once, when they add or fill the row.)
 - Keep a "Check this: ..." line in Notes. The owner removes it after checking.
@@ -110,7 +103,7 @@ WHAT TO WRITE
 PRICE ALERTS (nightly run only, after pricing)
 - Read the "Alert On Change (%)" setting on the 'Summary' tab. If it's blank or 0, skip alerts.
 - An alert is a repriced row that already had a verified value before this run (its Last Checked was filled), where the value moved by at least that percentage and by at least $5, up or down.
-- If there are any, send ONE email with the Gmail connector to {{EMAIL}}. Subject: "Collection Tracker: N price changes". Body: one line per item, biggest change first, like "Charizard (Pokémon): $310.00 to $412.50, up 33% (median of 6 sold, PriceCharting)", then the sheet's link (https://docs.google.com/spreadsheets/d/{{SHEET_ID}}/edit). Plain text. No email when nothing moved. If the Gmail connector isn't available, skip the email and put the alerts in the Price Log Notes instead.
+- If there are any, send ONE email with the Gmail connector to {{EMAIL}}. Subject: "Collection Tracker: N price changes". Body: one line per item, biggest change first, like "Charizard (Pokémon): $310.00 to $412.50, up 33% (median of 6 eBay sold)", then the sheet's link (https://docs.google.com/spreadsheets/d/{{SHEET_ID}}/edit). Plain text. No email when nothing moved. If the Gmail connector isn't available, skip the email and put the alerts in the Price Log Notes instead.
 
 LOG EVERY RUN (last step, even when nothing was priced)
 1. Measure this session's token usage with Bash:
@@ -131,4 +124,4 @@ EOF
 2. Find the first empty row in 'Price Log' (read 'Price Log'!A:A) and write one row to A:K: Date (YYYY-MM-DD), Started (h:mm AM/PM when you began), Finished (h:mm AM/PM now), Run ("Nightly" or "Immediate"), Priced (rows given a new verified value), Couldn't Price (rows marked no reliable sold data), Still Due (rows still due for repricing after this run), New Tokens, Cached Tokens, New Tokens Per Item (New Tokens divided by rows handled, rounded; blank if none), Notes (items added from photos, scans identified, photos or scans you couldn't identify, certificates checked, the accuracy sample, alerts emailed, stopped at 8:00 AM, errors, or anything unusual; otherwise blank).
 
 FINISH
-End with a short summary: which kind of run this was; items added from photos and scans identified (tab, name, row, and any "Check this"); certificates verified or flagged; the accuracy sample (Sundays); each item priced (tab, name, old value, new value, sources, and graded prices if found); anything you could not price; alerts sent; how many rows are still due for repricing; tokens used; and any "Suggested sources" for new tabs. If there was nothing to price, say so in one line.
+End with a short summary: which kind of run this was; items added from photos and scans identified (tab, name, row, and any "Check this"); certificates verified or flagged; the accuracy sample (Sundays); each item priced (tab, name, old value, new value, sources, and graded prices if found); anything you could not price; alerts sent; how many rows are still due for repricing; and tokens used. If there was nothing to price, say so in one line.

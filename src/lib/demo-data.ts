@@ -86,7 +86,7 @@ function build() {
             ? `Free price $${s.value} on ${isoDay(checked)}: TCGplayer market price, ${s.details["Set"] ?? ""} ${s.details["Card #"] ?? s.details["Collector #"] ?? s.details["Set Code"] ?? ""}.`
             : s.source === "asking"
               ? `Asking $${s.value} on ${isoDay(checked)}: median of 7 current eBay listings (asking prices, not sales).`
-              : `Verified $${s.value} on ${isoDay(checked)}: median of ${5 + (n % 6)} sold (eBay sold, 130point).`;
+              : `Verified $${s.value} on ${isoDay(checked)}: median of ${5 + (n % 6)} sold (eBay sold).`;
     items.push(
       toItem({
         id,
