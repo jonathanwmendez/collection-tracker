@@ -1,7 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { categoryByName } from "./categories";
-import { askingPrice, ebayConfigured } from "./ebay";
+import { askingPrice, askingPriceForItem, ebayConfigured } from "./ebay";
 import { getGoogleAccessToken } from "./google";
 import { canCheckPrice, lookupCardPrice, priceByCatalogId } from "./prices";
 import { needsFreePrice } from "./reprice-rules";
@@ -28,9 +28,10 @@ export type RepriceResult = { checked: number; priced: number; skipped: number; 
 /**
  * The free morning repricing, no Claude:
  * - Magic, Pokémon, Yu-Gi-Oh!: today's market price from their card databases, every day.
- * - Sports cards: typical asking price from current eBay listings, once they're past the repricing window
- *   (only when eBay is connected).
- * Prices set by Claude's sold-price check or by hand are left for Claude's nightly run.
+ * - Sports cards: typical asking price from current eBay listings, once they're past the repricing window.
+ * - Everything else (figures, cereal boxes, memorabilia, sealed products): the same, plus right away for any
+ *   item that has no value yet.
+ * eBay prices need EBAY_CLIENT_ID and EBAY_CLIENT_SECRET. Prices set by hand are never overwritten.
  */
 export async function repriceFree(db: SupabaseClient, userId: string, opts: { deadline: number }): Promise<RepriceResult> {
   const { data: settings } = await db.from("settings").select("sheet_id, reprice_after_days, claude_threshold").eq("user_id", userId).maybeSingle();
@@ -92,7 +93,8 @@ export async function repriceFree(db: SupabaseClient, userId: string, opts: { de
           note = `Free price $${res.value} on ${today}: ${res.source}, ${res.matched}${cond && cond !== "NM" ? `, near-mint price (card is ${cond})` : ""}.`;
         }
       } else {
-        const res = await askingPrice({ name: r.name, details: r.details ?? {} });
+        const item = { name: r.name, details: r.details ?? {} };
+        const res = r.category === "Sports Cards" ? await askingPrice(item) : await askingPriceForItem(item);
         if (res) {
           value = res.value;
           note = res.note;

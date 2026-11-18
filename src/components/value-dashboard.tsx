@@ -33,6 +33,7 @@ export function ValueDashboard({
   links,
   view,
   upkeepAction,
+  priceNowAction,
 }: {
   items: Item[];
   snapshots: DashboardSnapshot[];
@@ -42,6 +43,7 @@ export function ValueDashboard({
   links: { item: (id: string) => string; category: (slug: string) => string };
   view?: RowView;
   upkeepAction?: React.ReactNode;
+  priceNowAction?: React.ReactNode;
 }) {
   const t = summarize(items, days);
   const settings = { grading_cost: gradingCost };
@@ -262,10 +264,15 @@ export function ValueDashboard({
           </li>
         </ul>
         <p className="text-sm text-muted">
-          Claude&apos;s price check runs nightly at 3:30 AM on your Claude plan. It prices every item waiting for a check, then rechecks the oldest
-          prices until none are due or it reaches 8:00 AM. Each run is logged in the sheet&apos;s Price Log tab.
+          Claude&apos;s price check runs nightly at 3:30 AM on your Claude plan and prices trading cards from eBay sold listings and TCGplayer.
+          Each run is logged in the sheet&apos;s Price Log tab. At 9 AM the app adds free prices: card databases for Magic, Pokémon and
+          Yu-Gi-Oh!, and typical asking prices from current eBay listings for sports cards and everything else. Prices you set by hand are never
+          changed.
         </p>
-        {staleCount > 0 && upkeepAction}
+        <div className="flex flex-wrap gap-2">
+          {priceNowAction}
+          {staleCount > 0 && upkeepAction}
+        </div>
       </section>
 
       {top.length > 0 && (

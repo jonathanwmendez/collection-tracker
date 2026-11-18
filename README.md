@@ -18,8 +18,8 @@ A Google Sheet is the main copy of the collection. Four pieces work on it:
 |---|---|---|
 | **Scan page** | This web app, on your phone | Tap Add and the camera opens. Hold up any item: it snaps on its own, reads the text on the phone, and works out what it is (sports card, Magic, Pokémon, Yu-Gi-Oh!, or something else). The selector at the top follows what you scan. It takes 1 photo per item (the front) unless you switch to 2 (front and back), which helps sports cards since they're read from the back. Auto snap outlines the item and auto capture takes the photo when it's still and in focus; retake, delete, and fix matches as you go. It saves to the sheet with a free price, or shows the top 3 matches when unsure. Works offline and catches up when the signal returns. No Claude usage |
 | **Collection Intake** | A Claude artifact | For anything that isn't a card: take photos and you're done. They upload to a Drive inbox, and a minute after the last one (or when you tap Done) the background task starts, so items show up in a few minutes. If it can't start, they wait for the nightly run |
-| **Morning pricing** | This web app, daily at 9 AM | Free prices, no Claude: Magic, Pokémon, and Yu-Gi-Oh! from their card databases every day, and sports cards from current eBay listings (labeled "asking") once they're due |
-| **Background task** | A Claude scheduled task, nightly at 3:30 AM, plus right after Collection Intake uploads | Identifies Intake photos and scans the app couldn't read, prices from recent sold listings (everything that isn't a card, plus cards worth at least the "Claude Check Over" amount, $10 by default), checks certificates, samples the free prices for accuracy on Sundays, adds PSA 9 and PSA 10 prices, emails alerts for big moves, and logs each run to a Price Log tab. Stops starting new items at 8:00 AM |
+| **Morning pricing** | This web app, daily at 9 AM | Free prices, no Claude: Magic, Pokémon, and Yu-Gi-Oh! from their card databases every day. Sports cards and everything that isn't a card (figures, boxes, memorabilia, sealed products) from current eBay listings, labeled "asking": right away when an item has no value, then again once it's due. Prices set by hand are never changed. **Get prices now** on the Value page runs it on demand |
+| **Background task** | A Claude scheduled task, nightly at 3:30 AM, plus right after Collection Intake uploads | Identifies Intake photos and scans the app couldn't read, prices cards from eBay sold listings and TCGplayer (new cards the free sources couldn't match, plus cards worth at least the "Claude Check Over" amount, $10 by default), checks certificates, samples the free prices for accuracy on Sundays, adds PSA 9 and PSA 10 prices, emails alerts for big moves, and logs each run to a Price Log tab. Stops starting new items at 8:00 AM |
 
 The app makes no paid AI calls. Only the background task uses a Claude subscription: overnight, plus a short run after each batch of Collection Intake photos.
 
@@ -30,7 +30,7 @@ The app makes no paid AI calls. Only the background task uses a Claude subscript
 - Editing saved to the sheet (each write checks it still has the right row), delete, queue for repricing, add without a photo with a duplicate check
 - Profit tracking: what you paid, what you sold for, gain so far, and realized profit
 - Value dashboard: total over time (snapshot every morning), change by category, biggest price moves, grading candidates, price upkeep, CSV export, and a printable insurance report
-- Free card prices for Magic, Pokémon, and Yu-Gi-Oh! (Scryfall, Pokémon TCG API, YGOPRODeck), and eBay asking prices for sports cards (eBay Browse API)
+- Free card prices for Magic, Pokémon, and Yu-Gi-Oh! (Scryfall, Pokémon TCG API, YGOPRODeck), and eBay asking prices for sports cards and everything else (eBay Browse API)
 - Settings kept the same in the app and the sheet: repricing window, alert threshold, grading cost, Claude check amount
 - Invite-only accounts with an Admin page and a setup checklist for each new person, and view-only share links
 
@@ -40,7 +40,7 @@ The app makes no paid AI calls. Only the background task uses a Claude subscript
 
 About 30 minutes. Do the steps in order: each one uses an address from the one before. Checked against each service in November 2026.
 
-**You need:** a Google account, a GitHub account, free Supabase and Vercel accounts, and a Claude plan with scheduled tasks and artifacts. Optional: a free [eBay developer account](https://developer.ebay.com) for sports card asking prices. In Claude (**Settings > Connectors**), connect:
+**You need:** a Google account, a GitHub account, free Supabase and Vercel accounts, and a Claude plan with scheduled tasks and artifacts. Optional: a free [eBay developer account](https://developer.ebay.com) for asking prices on sports cards and everything that isn't a card. In Claude (**Settings > Connectors**), connect:
 
 | Connector | Used by | For |
 |---|---|---|
@@ -90,7 +90,7 @@ If Claude did this in step 1, skip to step 4. You still need the client secret y
 | `GOOGLE_CLIENT_SECRET` | Google client secret |
 | `CRON_SECRET` | A long random string. Vercel sends it to the daily sync so only Vercel can run it |
 | `POKEMONTCG_API_KEY` | Optional, raises the Pokémon price lookup limit ([pokemontcg.io](https://pokemontcg.io)) |
-| `EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET` | Optional, turns on sports card asking prices. From your eBay developer account's Production keyset: App ID and Cert ID |
+| `EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET` | Optional, turns on asking prices for sports cards and everything that isn't a card. From your eBay developer account's Production keyset: App ID and Cert ID |
 
 If you change a variable later, redeploy for it to take effect.
 

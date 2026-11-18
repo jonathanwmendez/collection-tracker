@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getItems, getMovers, getSettings, getSnapshots } from "@/lib/data";
 import { isSold, isStale } from "@/lib/collection";
 import { EmptyState } from "@/components/empty-state";
+import { RepriceNow } from "@/components/reprice-now";
 import { RepriceStale } from "@/components/reprice-stale";
 import { SyncBar } from "@/components/sync";
 import { ValueDashboard } from "@/components/value-dashboard";
@@ -54,6 +55,7 @@ export default async function ValuePage() {
         gradingCost={settings.grading_cost}
         links={{ item: (id) => `/items/${id}`, category: (slug) => `/collection/${slug}` }}
         upkeepAction={<RepriceStale count={staleCount} />}
+        priceNowAction={<RepriceNow />}
       />
     </div>
   );

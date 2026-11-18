@@ -11,12 +11,19 @@ export function needsFreePrice(
   // Prices set by hand are never overwritten. Claude's sold-price checks are kept while the card is worth at
   // least the "Claude Check Over" amount; below it, the card goes back to the free sources once it's due.
   if (source === "hand") return false;
+  // Everything that isn't a trading card (figures, cereal boxes, memorabilia): eBay asking prices, since sold
+  // listings can't be read. Priced right away when it has no value, then again once past the repricing window.
+  if (!canCheckPrice(r.category) && r.category !== "Sports Cards") {
+    if (!o.ebayOn) return false;
+    const value = r.market_value === null || r.market_value === undefined || r.market_value === "" ? NaN : Number(r.market_value);
+    const due = !r.last_checked || r.last_checked < o.cutoff;
+    return !Number.isFinite(value) || (source === "claude" ? !!r.last_checked && r.last_checked < o.cutoff : due);
+  }
   if (source === "claude") {
     const value = Number(r.market_value);
     const card = canCheckPrice(r.category) || r.category === "Sports Cards";
     if (!card || !Number.isFinite(value) || value >= (o.threshold ?? 10) || !r.last_checked || r.last_checked >= o.cutoff) return false;
   }
   if (canCheckPrice(r.category)) return r.last_checked !== o.today;
-  if (r.category === "Sports Cards") return o.ebayOn && (!r.last_checked || r.last_checked < o.cutoff);
-  return false;
+  return o.ebayOn && (!r.last_checked || r.last_checked < o.cutoff);
 }

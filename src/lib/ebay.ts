@@ -1,5 +1,6 @@
-// Typical asking prices for sports cards from current eBay listings (eBay's Browse API, free with a
-// developer account). These are listings, not sales, so they're labeled "asking" everywhere.
+// Typical asking prices from current eBay listings (eBay's Browse API, free with a developer account):
+// sports cards, and every item that isn't a trading card. These are listings, not sales, so they're labeled
+// "asking" everywhere.
 // Off until EBAY_CLIENT_ID and EBAY_CLIENT_SECRET are set in Vercel.
 
 type Fetch = typeof fetch;
@@ -87,4 +88,81 @@ export async function askingPrice(
   const value = Math.round(median(prices) * 100) / 100;
   const today = new Date().toISOString().slice(0, 10);
   return { value, note: `Asking $${value} on ${today}: median of ${prices.length} current eBay listings (asking prices, not sales).` };
+}
+
+// Words that describe how an item is kept or shown rather than what it is: sellers rarely put them in titles.
+const FILLER = new Set(
+  "the a an and of with in on for from to by at or kid kids kid's kids' toddler mirrored framed frame print photo collage box boxes bag cup bottle can wrapper sealed used new vintage original edition collector collector's collectible collectibles commemorative all teams team".split(
+    " ",
+  ),
+);
+
+/** The words that identify an item in a listing title, most telling first. Pure, so it can be tested. */
+export function itemKeywords(name: string): string[] {
+  const words = name
+    .toLowerCase()
+    .replace(/[\u2018\u2019]/g, "'")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9.' ]+/g, " ")
+    .split(/\s+/)
+    .map((w) => w.replace(/^['.]+|['.]+$/g, "").replace(/'s$/, ""))
+    .filter((w) => w.length > 1 && !FILLER.has(w));
+  return [...new Set(words)].slice(0, 8);
+}
+
+/**
+ * Prices of listings that look like the same item: enough of its keywords in the title, the year when one is
+ * known, and not a lot or bundle. Pure, so it can be tested.
+ */
+export function matchingItemListings(keywords: string[], year: string, items: Summary[]): number[] {
+  const need = Math.max(1, Math.ceil(keywords.length * 0.6));
+  return items
+    .filter((i) => i.price?.currency === "USD")
+    .filter((i) => {
+      const t = i.title.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      if (NOT_SINGLE.test(t)) return false;
+      if (year && !t.includes(year)) return false;
+      return keywords.filter((k) => t.includes(k)).length >= need;
+    })
+    .map((i) => Number(i.price!.value))
+    .filter((v) => Number.isFinite(v) && v > 0);
+}
+
+/**
+ * The median asking price of current listings for any item that isn't a trading card (figures, cereal boxes,
+ * board games, memorabilia), or null when fewer than 3 listings match. Tries the name with its year first,
+ * then without the year, then with fewer words.
+ */
+export async function askingPriceForItem(
+  item: { name: string; details: Record<string, string> },
+  f: Fetch = fetch,
+): Promise<{ value: number; note: string } | null> {
+  const token = await appToken(f);
+  if (!token) return null;
+  const keywords = itemKeywords(item.name);
+  if (!keywords.length) return null;
+  const year = (item.details["Year"] ?? item.details["Date"] ?? "").match(/\b(1[89]\d\d|20\d\d)\b/)?.[1] ?? "";
+  const tries: Array<[string[], string]> = [[keywords, year]];
+  if (year) tries.push([keywords, ""]);
+  if (keywords.length > 5) tries.push([keywords.slice(0, 5), ""]);
+  for (const [words, y] of tries) {
+    const q = [...words, y].filter(Boolean).join(" ");
+    const params = new URLSearchParams({ q, limit: "50", filter: "buyingOptions:{FIXED_PRICE}" });
+    const res = await f(`https://api.ebay.com/buy/browse/v1/item_summary/search?${params}`, {
+      headers: { authorization: `Bearer ${token}`, "x-ebay-c-marketplace-id": "EBAY_US" },
+    });
+    if (!res.ok) {
+      console.error("eBay search failed", res.status, (await res.text().catch(() => "")).slice(0, 200));
+      return null;
+    }
+    const body = (await res.json()) as { itemSummaries?: Summary[] };
+    const prices = matchingItemListings(words, y, body.itemSummaries ?? []);
+    if (prices.length >= 3) {
+      const value = Math.round(median(prices) * 100) / 100;
+      const today = new Date().toISOString().slice(0, 10);
+      return { value, note: `Asking $${value} on ${today}: median of ${prices.length} current eBay listings (asking prices, not sales).` };
+    }
+  }
+  return null;
 }

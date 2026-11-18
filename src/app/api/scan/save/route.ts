@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { jsonError, requireUser } from "@/lib/api-auth";
 import { errorResponse } from "@/lib/api-errors";
 import { categoryByName } from "@/lib/categories";
-import { askingPrice } from "@/lib/ebay";
+import { askingPrice, askingPriceForItem } from "@/lib/ebay";
+import { canCheckPrice } from "@/lib/prices";
 import type { Candidate } from "@/lib/identify";
 import { saveScan, ScanError } from "@/lib/scan";
 
@@ -47,8 +48,10 @@ export async function POST(request: Request) {
   };
 
   try {
-    // Sports cards have no free card database; use typical asking prices from eBay listings when connected.
-    const asking = !candidate.price && category.name === "Sports Cards" && !candidate.name.startsWith("Unidentified") ? await askingPrice(candidate).catch(() => null) : null;
+    // Sports cards and non-card items have no free price database; use typical asking prices from eBay
+    // listings when connected.
+    const lookup = category.name === "Sports Cards" ? askingPrice : canCheckPrice(category.name) ? null : askingPriceForItem;
+    const asking = !candidate.price && lookup && !candidate.name.startsWith("Unidentified") ? await lookup(candidate).catch(() => null) : null;
     const result = await saveScan(auth.supabase, auth.user.id, {
       candidate,
       condition: text(body.condition, 60),
