@@ -8,11 +8,17 @@ type Fetch = typeof fetch;
 export const ebayConfigured = () => Boolean(process.env.EBAY_CLIENT_ID && process.env.EBAY_CLIENT_SECRET);
 
 let cached: { token: string; expires: number } | null = null;
+// When eBay turns the keys down, remember it for a minute so a run doesn't ask again for every item.
+let refused: { at: number; reason: string } | null = null;
+
+/** Why eBay last refused the keys, if it did in the past minute (so a run can say so instead of "no matches"). */
+export const ebayKeyProblem = () => (refused && Date.now() - refused.at < 60_000 ? refused.reason : null);
 
 async function appToken(f: Fetch): Promise<string | null> {
   if (cached && cached.expires > Date.now() + 60_000) return cached.token;
-  const id = process.env.EBAY_CLIENT_ID;
-  const secret = process.env.EBAY_CLIENT_SECRET;
+  if (ebayKeyProblem()) return null;
+  const id = process.env.EBAY_CLIENT_ID?.trim();
+  const secret = process.env.EBAY_CLIENT_SECRET?.trim();
   if (!id || !secret) return null;
   const res = await f("https://api.ebay.com/identity/v1/oauth2/token", {
     method: "POST",
@@ -20,9 +26,12 @@ async function appToken(f: Fetch): Promise<string | null> {
     body: new URLSearchParams({ grant_type: "client_credentials", scope: "https://api.ebay.com/oauth/api_scope" }),
   });
   if (!res.ok) {
-    console.error("eBay token failed", res.status, (await res.text().catch(() => "")).slice(0, 200));
+    const body = (await res.text().catch(() => "")).slice(0, 200);
+    console.error("eBay token failed", res.status, body);
+    refused = { at: Date.now(), reason: /invalid_client/.test(body) ? "eBay didn't accept the App ID and Cert ID" : `eBay sign-in failed (${res.status})` };
     return null;
   }
+  refused = null;
   const body = (await res.json()) as { access_token: string; expires_in: number };
   cached = { token: body.access_token, expires: Date.now() + body.expires_in * 1000 };
   return cached.token;

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { api } from "@/lib/api-client";
 import { Notice } from "./notice";
 
-type Result = { checked: number; priced: number; skipped: number; outOfTime: boolean; ebay: boolean };
+type Result = { checked: number; priced: number; skipped: number; outOfTime: boolean; ebay: boolean; ebayProblem: string | null };
 
 /** Runs the free morning repricing now instead of waiting for 9 AM. */
 export function RepriceNow() {
@@ -20,6 +20,10 @@ export function RepriceNow() {
     setBusy(false);
     if (!r.ok) return setMsg({ kind: "bad", text: r.error, needsSignIn: r.needsSignIn });
     const d = r.data;
+    if (d.ebayProblem) {
+      setMsg({ kind: "bad", text: `${d.ebayProblem}, so no eBay prices were looked up. Check the Production keys in Vercel (README step 4).${d.priced ? ` Priced ${d.priced} cards from the card databases.` : ""}` });
+      return router.refresh();
+    }
     const parts = [
       d.checked === 0 ? "Nothing needed a price right now." : `Priced ${d.priced} of ${d.checked}.`,
       d.checked > d.priced ? `${d.checked - d.priced} had too few matching listings; they're tried again each morning.` : "",

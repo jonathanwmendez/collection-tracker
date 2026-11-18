@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/api-auth";
 import { errorResponse } from "@/lib/api-errors";
-import { ebayConfigured } from "@/lib/ebay";
+import { ebayConfigured, ebayKeyProblem } from "@/lib/ebay";
 import { repriceFree } from "@/lib/reprice";
 import { syncCollection } from "@/lib/sync";
 
@@ -20,7 +20,7 @@ export async function POST() {
     // Leave room under the 300-second limit for the writes and the final sync.
     const result = await repriceFree(supabase, user.id, { deadline: Date.now() + 220_000 });
     if (result.priced > 0) await syncCollection(supabase, user.id, { force: true });
-    return NextResponse.json({ ...result, ebay: ebayConfigured() });
+    return NextResponse.json({ ...result, ebay: ebayConfigured(), ebayProblem: ebayKeyProblem() });
   } catch (e) {
     return errorResponse(e, "Couldn't get prices. Try again.");
   }
