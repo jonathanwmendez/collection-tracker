@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CATEGORIES, categoryByName } from "./categories";
 import { driveModifiedTime, getGoogleAccessToken } from "./google";
-import { parseRow, photoSides, priceSource, priceSummary, todayISO, type SheetItem } from "./sheet-format";
+import { colIndex, fillMissingColumns, parseRow, photoSides, priceSource, priceSummary, todayISO, type KnownItem, type SheetItem } from "./sheet-format";
 import { getTabs, readSummarySettings, readTabs, type SummaryValues } from "./sheets";
 
 export class SyncError extends Error {
@@ -27,7 +27,7 @@ export type SyncResult = {
   unchanged?: boolean;
 };
 
-type Existing = { id: string; category: string; name: string; sheet_row: number | null; market_value: string | number | null; last_checked: string | null; row_hash: string | null };
+type Existing = Omit<KnownItem, "backPhotoIds" | "coaPhotoIds"> & { id: string; category: string; name: string; sheet_row: number | null; row_hash: string | null };
 type ExistingPhoto = {
   id: string;
   item_id: string;
@@ -75,7 +75,7 @@ export async function syncCollection(supabase: SupabaseClient, userId: string, o
     readTabs(token, sheetId, present),
     "Summary" in tabs ? readSummarySettings(token, sheetId) : Promise.resolve({} as SummaryValues),
   ]);
-  const sheetItems: SheetItem[] = [];
+  let sheetItems: SheetItem[] = [];
   for (const tab of present) {
     const { headers, rows } = data[tab]!;
     rows.forEach((cells, i) => {
@@ -87,7 +87,10 @@ export async function syncCollection(supabase: SupabaseClient, userId: string, o
   let existing: Existing[];
   try {
     existing = await selectAll<Existing>((from, to) =>
-      supabase.from("items").select("id, category, name, sheet_row, market_value, last_checked, row_hash").eq("user_id", userId).order("id").range(from, to),
+      supabase
+        .from("items")
+        .select("id, category, name, sheet_row, market_value, last_checked, row_hash, notes, paid, sold_price, sold_on, psa9, psa10, location, catalog_id, authenticator, cert_number")
+        .eq("user_id", userId).order("id").range(from, to),
     );
   } catch {
     throw new SyncError("Couldn't read the app's copy of your collection.", 500);
@@ -113,6 +116,29 @@ export async function syncCollection(supabase: SupabaseClient, userId: string, o
       matched.set(s, e);
       used.add(e.id);
     }
+  }
+
+  // Tabs without the Notes column (and the columns after it) keep what the app already knows for those fields.
+  const photos = await selectAll<ExistingPhoto>((from, to) =>
+    supabase.from("photos").select("id, item_id, drive_file_id, preview_path, position, side").eq("user_id", userId).order("id").range(from, to),
+  );
+  const photosByItem = new Map<string, ExistingPhoto[]>();
+  for (const p of photos) photosByItem.set(p.item_id, [...(photosByItem.get(p.item_id) ?? []), p]);
+  const today = todayISO();
+  const filled = new Map<SheetItem, SheetItem>();
+  sheetItems = sheetItems.map((s) => {
+    const headers = data[s.category]!.headers;
+    const e = matched.get(s);
+    const have = e ? (photosByItem.get(e.id) ?? []) : [];
+    const sideIds = (side: ExistingPhoto["side"]) => have.filter((p) => p.side === side && p.drive_file_id).sort((a, b) => a.position - b.position).map((p) => p.drive_file_id!);
+    const known = e ? { ...e, backPhotoIds: sideIds("back"), coaPhotoIds: sideIds("coa") } : undefined;
+    const f = fillMissingColumns(s, (h) => colIndex(headers, h) !== undefined, known, today);
+    filled.set(f, s);
+    return f;
+  });
+  for (const f of sheetItems) {
+    const e = matched.get(filled.get(f)!);
+    if (e) matched.set(f, e);
   }
 
   const idOf = new Map<SheetItem, string>();
@@ -158,11 +184,6 @@ export async function syncCollection(supabase: SupabaseClient, userId: string, o
   const removed = existing.filter((e) => !used.has(e.id));
 
   // Photos: one row per Drive file linked in the Photo column, then the Back Photo column (cards).
-  const photos = await selectAll<ExistingPhoto>((from, to) =>
-    supabase.from("photos").select("id, item_id, drive_file_id, preview_path, position, side").eq("user_id", userId).order("id").range(from, to),
-  );
-  const photosByItem = new Map<string, ExistingPhoto[]>();
-  for (const p of photos) photosByItem.set(p.item_id, [...(photosByItem.get(p.item_id) ?? []), p]);
 
   const newPhotos: Array<Record<string, unknown>> = [];
   const movedPhotos: Array<{ id: string; position: number; side: ExistingPhoto["side"] }> = [];

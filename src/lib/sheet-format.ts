@@ -370,3 +370,55 @@ export function stripPriceNotes(notes: string): string {
     .replace(/\s*Price check \d{4}-\d{2}-\d{2}: no reliable sold data.*?\.(?=\s|$)/gi, "")
     .trim();
 }
+
+/** What the app already has for an item, used when the sheet tab doesn't have some columns. */
+export type KnownItem = {
+  notes: string | null;
+  market_value: number | string | null;
+  last_checked: string | null;
+  paid: number | string | null;
+  sold_price: number | string | null;
+  sold_on: string | null;
+  psa9: number | string | null;
+  psa10: number | string | null;
+  location: string | null;
+  catalog_id: string | null;
+  authenticator: string | null;
+  cert_number: string | null;
+  backPhotoIds: string[];
+  coaPhotoIds: string[];
+};
+
+const num = (v: number | string | null | undefined) => (v === null || v === undefined || v === "" ? null : Number(v));
+
+/**
+ * Sheets can drop the Notes column and everything after it (Paid, Sold, PSA, photos, Location, certificates).
+ * For each column a tab doesn't have, keep what the app already knows instead of clearing it. Without Notes,
+ * a price that changed on the sheet (typed in, or written by the scheduled price check) is recorded as set by
+ * hand, so the morning repricing leaves it alone. Pure, so it can be tested.
+ */
+export function fillMissingColumns(s: SheetItem, has: (header: string) => boolean, known: KnownItem | undefined, today: string): SheetItem {
+  const out = { ...s };
+  if (!has(COL.notes)) {
+    const base = known?.notes ?? "";
+    const changed = known ? num(known.market_value) !== s.marketValue || (known.last_checked ?? null) !== s.lastChecked : s.marketValue !== null;
+    out.notes =
+      changed && s.marketValue !== null
+        ? appendNote(stripPriceNotes(base), `Set by hand to $${s.marketValue} on ${s.lastChecked ?? today}.`)
+        : base;
+    out.valueStatus = valueStatusOf(s.lastChecked, out.notes);
+  }
+  if (!known) return out;
+  if (!has(COL.paid)) out.paid = num(known.paid);
+  if (!has(COL.soldPrice)) out.soldPrice = num(known.sold_price);
+  if (!has(COL.soldDate)) out.soldOn = known.sold_on;
+  if (!has(COL.psa9)) out.psa9 = num(known.psa9);
+  if (!has(COL.psa10)) out.psa10 = num(known.psa10);
+  if (!has(COL.location)) out.location = known.location ?? "";
+  if (!has(COL.catalogId)) out.catalogId = known.catalog_id ?? "";
+  if (!has(COL.authenticator)) out.authenticator = known.authenticator ?? "";
+  if (!has(COL.certNumber)) out.certNumber = known.cert_number ?? "";
+  if (!has(COL.backPhoto)) out.backPhotoIds = known.backPhotoIds;
+  if (!has(COL.coaPhoto)) out.coaPhotoIds = known.coaPhotoIds;
+  return out;
+}
