@@ -137,8 +137,12 @@ export async function syncCollection(supabase: SupabaseClient, userId: string, o
     return f;
   });
   for (const f of sheetItems) {
-    const e = matched.get(filled.get(f)!);
-    if (e) matched.set(f, e);
+    const orig = filled.get(f)!;
+    const e = matched.get(orig);
+    if (e && orig !== f) {
+      matched.delete(orig);
+      matched.set(f, e);
+    }
   }
 
   const idOf = new Map<SheetItem, string>();
