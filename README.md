@@ -23,6 +23,8 @@ A Google Sheet is the main copy of the collection. Four pieces work on it:
 
 The app makes no paid AI calls. Only the background task uses a Claude subscription: overnight, plus a short run after each batch of Collection Intake photos.
 
+Compact sheets: a tab can drop Total Value and every column from Notes onward. The app then keeps notes, purchase and sale details, extra photos, and certificates in its own database, and treats a price changed on the sheet as set by hand. Use `claude/price-check-compact.md` as the scheduled task prompt for that layout.
+
 **App features:**
 - Collection: search, category lists with filters, item pages with full-screen photos (cards show front and back) and price history, and a list of items Claude flagged to check
 - Location (which box or binder), certificates of authenticity with a lookup link, and a Sets & Sealed tab for factory-sealed products
