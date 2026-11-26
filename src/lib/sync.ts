@@ -40,6 +40,11 @@ type ExistingPhoto = {
 // How a price was found, for the item's price history.
 const METHOD_BY_SOURCE = { claude: "sheet", free: "tcgplayer", asking: "ebay_asking", hand: "manual", none: "sheet" } as const;
 
+/** Set SYNC_PAUSED=1 on the server to stop all syncs (app opens, edits, and the daily job). */
+export function syncPaused(): boolean {
+  return process.env.SYNC_PAUSED === "1";
+}
+
 const CHUNK = 500;
 const chunks = <T,>(list: T[]) => Array.from({ length: Math.ceil(list.length / CHUNK) }, (_, i) => list.slice(i * CHUNK, (i + 1) * CHUNK));
 
@@ -56,6 +61,12 @@ export async function syncCollection(supabase: SupabaseClient, userId: string, o
     .maybeSingle();
   const sheetId = settings?.sheet_id as string | undefined;
   if (!sheetId) throw new SyncError("Connect your Google Sheet in Settings first.", 400);
+
+  // Paused: leave the app's copy exactly as it is and don't read the sheet.
+  if (syncPaused()) {
+    const { count } = await supabase.from("items").select("id", { count: "exact", head: true }).eq("user_id", userId);
+    return { items: count ?? 0, added: 0, updated: 0, removed: 0, syncedAt: (settings?.last_synced_at as string) ?? new Date().toISOString(), missingTabs: [], unchanged: true };
+  }
 
   const token = await getGoogleAccessToken(userId);
 

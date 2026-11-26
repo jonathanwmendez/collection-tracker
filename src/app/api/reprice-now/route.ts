@@ -3,7 +3,7 @@ import { requireUser } from "@/lib/api-auth";
 import { errorResponse } from "@/lib/api-errors";
 import { ebayConfigured, ebayKeyProblem } from "@/lib/ebay";
 import { repriceFree } from "@/lib/reprice";
-import { syncCollection } from "@/lib/sync";
+import { syncCollection, syncPaused } from "@/lib/sync";
 
 export const maxDuration = 300;
 
@@ -15,6 +15,9 @@ export async function POST() {
   const auth = await requireUser();
   if (auth.error) return auth.error;
   const { supabase, user } = auth;
+  if (syncPaused()) {
+    return NextResponse.json({ error: "Syncing with the sheet is paused, so prices can't be updated right now." }, { status: 409 });
+  }
   try {
     await syncCollection(supabase, user.id, { force: true });
     // Leave room under the 300-second limit for the writes and the final sync.

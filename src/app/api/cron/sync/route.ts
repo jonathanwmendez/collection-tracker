@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { GoogleError } from "@/lib/google";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { repriceFree } from "@/lib/reprice";
-import { syncCollection } from "@/lib/sync";
+import { syncCollection, syncPaused } from "@/lib/sync";
 
 export const maxDuration = 300;
 
@@ -24,6 +24,10 @@ function authorized(request: Request): boolean {
  */
 export async function GET(request: Request) {
   if (!authorized(request)) return NextResponse.json({ error: "Not allowed." }, { status: 401 });
+  if (syncPaused()) {
+    console.log("Daily sync skipped: SYNC_PAUSED is set");
+    return NextResponse.json({ synced: 0, failed: 0, paused: true });
+  }
 
   const admin = createAdminClient();
   const { data: rows } = await admin.from("settings").select("user_id").not("sheet_id", "is", null);
